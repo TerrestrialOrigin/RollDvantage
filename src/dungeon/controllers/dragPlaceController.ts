@@ -1,0 +1,133 @@
+/* ============================================================
+   Drag-to-place controller — drag a legend icon onto a DM-map cell to place a
+   marker, or drag an existing marker to move it. Gesture interpretation (4px
+   arm threshold, ghost/highlight) lives here; every mutation goes through the
+   DungeonEditor. A future touch controller is a sibling adapter calling the
+   same verbs. Logic preserved verbatim from the original drag handlers.
+   ============================================================ */
+import type { MarkerType } from '../model/types';
+import { iconSVG } from '../rendering/symbols';
+import { placeable, roomIndexAt, isCorridorCell } from '../geometry/topology';
+import { markerAtCell } from '../editing/featureQueries';
+import { dmSvg, cellAtClient } from './mapSurface';
+import type { ControllerContext } from './types';
+import type { CellHit } from '../geometry/grid';
+
+interface DragState {
+  mode: 'place' | 'move';
+  type: MarkerType;
+  index: number;
+  ghost: HTMLElement;
+  highlight: HTMLElement;
+  target: CellHit | null;
+  armed: boolean;
+  startX: number;
+  startY: number;
+}
+
+export function attachDragPlaceController(context: ControllerContext): void {
+  const { editor, getDungeon, modes } = context;
+  const dmWrap = document.getElementById('dm-map');
+  let drag: DragState | null = null;
+
+  function showTarget(cell: CellHit): void {
+    const dungeon = getDungeon()!;
+    const pixel = dungeon.grid.cell * cell.scale, highlight = drag!.highlight;
+    highlight.style.display = 'block';
+    highlight.style.left = (cell.rect.left + cell.x * dungeon.grid.cell * cell.scale) + 'px';
+    highlight.style.top = (cell.rect.top + cell.y * dungeon.grid.cell * cell.scale) + 'px';
+    highlight.style.width = pixel + 'px'; highlight.style.height = pixel + 'px';
+  }
+
+  function arm(): void {
+    drag!.armed = true;
+    document.body.appendChild(drag!.ghost);
+    document.body.appendChild(drag!.highlight);
+    document.body.style.cursor = 'grabbing';
+  }
+
+  function onMove(event: PointerEvent): void {
+    if (!drag) return;
+    if (!drag.armed) {
+      const dx = event.clientX - drag.startX, dy = event.clientY - drag.startY;
+      if (dx * dx + dy * dy < 16) return;   // ignore <4px jitter so a plain click isn't a move
+      arm();
+    }
+    drag.ghost.style.left = event.clientX + 'px'; drag.ghost.style.top = event.clientY + 'px';
+    const dungeon = getDungeon();
+    const cell = dungeon ? cellAtClient(dungeon, event.clientX, event.clientY) : null;
+    if (cell && cell.inside && dungeon && placeable(dungeon, cell.x, cell.y)) { showTarget(cell); drag.target = cell; }
+    else { drag.highlight.style.display = 'none'; drag.target = null; }
+  }
+
+  function onUp(): void {
+    if (!drag) return;
+    const finished = drag; cleanup();
+    if (finished.mode === 'move' && !finished.armed) return; // a simple click on a mark = no-op
+    const cell = finished.target;
+    const dungeon = getDungeon();
+    if (!cell || !dungeon) return;
+    if (finished.mode === 'place') {
+      if (finished.type === 'secret') { editor.makeSecret(cell.x, cell.y); return; } // (S) converts a corridor/room to secret
+      editor.addMarker(finished.type, cell.x, cell.y);
+    } else {
+      const marker = dungeon.markers[finished.index];
+      if (marker) {
+        if (marker.type === 'secret') {
+          // the (S) badge IS the secret status — dragging it MOVES the secret.
+          const originX = marker.x, originY = marker.y;
+          const alreadySecret = !!dungeon.secretFloor && !!dungeon.secretFloor[cell.y] && dungeon.secretFloor[cell.y][cell.x] === 1;
+          const canConvert = !alreadySecret && (roomIndexAt(dungeon, cell.x, cell.y) >= 0 || isCorridorCell(dungeon, cell.x, cell.y));
+          if (canConvert) {
+            editor.unmakeSecret(originX, originY); // restore the old room/passage
+            editor.makeSecret(cell.x, cell.y);     // make the dropped-on room/corridor secret
+          }
+          return; // a bad drop leaves the secret untouched
+        }
+        editor.moveMarker(finished.index, cell.x, cell.y);
+      }
+    }
+  }
+
+  function cleanup(): void {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    document.body.style.cursor = '';
+    if (drag) { if (drag.ghost) drag.ghost.remove(); if (drag.highlight) drag.highlight.remove(); }
+    drag = null;
+  }
+
+  function startDrag(options: { mode: 'place' | 'move'; type: MarkerType; index?: number }, event: PointerEvent): void {
+    if (drag) cleanup();
+    const ghost = document.createElement('div'); ghost.className = 'drag-ghost'; ghost.innerHTML = iconSVG(options.type);
+    const highlight = document.createElement('div'); highlight.className = 'drag-cell'; highlight.style.display = 'none';
+    drag = { mode: options.mode, type: options.type, index: options.index ?? -1, ghost, highlight, target: null, armed: false, startX: event.clientX, startY: event.clientY };
+    if (options.mode === 'place') { arm(); onMove(event); }   // legend drag: grab immediately
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  // legend icons -> place a new mark
+  document.querySelectorAll('.legend-item').forEach((item) => {
+    const icon = item.querySelector('[data-icon]'); if (!icon) return;
+    item.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      startDrag({ mode: 'place', type: icon.getAttribute('data-icon') as MarkerType }, event as PointerEvent);
+    });
+  });
+
+  // marks already on the map -> drag to move
+  if (dmWrap) {
+    dmWrap.addEventListener('pointerdown', (event) => {
+      const pointerEvent = event;
+      if (modes.current) return;                 // structure-editing mode takes over
+      if (pointerEvent.button !== 0) return;      // left button only
+      const dungeon = getDungeon();
+      const svg = dmSvg(); if (!svg || !dungeon) return;
+      const cell = cellAtClient(dungeon, pointerEvent.clientX, pointerEvent.clientY); if (!cell?.inside) return;
+      const index = markerAtCell(dungeon, cell.x, cell.y);
+      if (index < 0) return;                      // empty square — leave it alone
+      startDrag({ mode: 'move', type: dungeon.markers[index].type, index }, pointerEvent);
+    });
+  }
+}

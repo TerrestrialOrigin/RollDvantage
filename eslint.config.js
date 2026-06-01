@@ -6,7 +6,7 @@ import react from 'eslint-plugin-react'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'capacitor.config.ts', 'android', 'ios'] },
+  { ignores: ['dist', 'capacitor.config.ts', 'android', 'ios', 'e2e', 'playwright.config.ts'] },
   {
     extends: [
       js.configs.recommended,
