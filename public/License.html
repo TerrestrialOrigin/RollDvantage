@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RollDvantage — Terms of Use &amp; License Agreement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="chronicle.css" />
+<style>
+  body{ padding:46px 16px 90px; }
+
+  /* one flowing parchment leaf, sized for reading + clean print */
+  .doc{
+    position:relative; width:min(7.6in, 100%); margin:0 auto;
+    background:var(--parch);
+    box-shadow:0 26px 60px -18px rgba(0,0,0,.7), 0 2px 0 rgba(0,0,0,.4);
+  }
+  .doc-frame{
+    position:relative;
+    border:1px solid oklch(0.7 0.04 76 / .55);
+    box-shadow:inset 0 0 0 3px oklch(0.78 0.04 80 / .25);
+    margin:0.42in; padding:0.7in 0.72in 0.62in;
+  }
+
+  /* masthead */
+  .lic-head{ text-align:center; margin-bottom:8px; }
+  .lic-over{
+    font-family:var(--font-struct); font-weight:500;
+    letter-spacing:.4em; text-transform:uppercase; font-size:11px;
+    color:var(--gold-deep); padding-left:.4em;
+  }
+  .lic-title{
+    font-family:var(--font-display); font-weight:900;
+    font-size:54px; line-height:1.02; margin:14px 0 0;
+    color:transparent;
+    background:linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
+    -webkit-background-clip:text; background-clip:text;
+    letter-spacing:.01em;
+  }
+  .lic-kicker{
+    font-style:italic; font-size:19px; color:var(--ink-soft); margin:12px 0 0;
+  }
+  .lic-meta{
+    font-family:var(--font-struct); font-size:10px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--gold-deep); margin:16px 0 0;
+  }
+  .lic-meta .dot{ color:var(--ink-soft); margin:0 .7em; }
+
+  /* sections */
+  .lic-sec{ margin-top:30px; }
+  .lic-sec:first-of-type{ margin-top:24px; }
+  .lic-sec h3{
+    display:flex; align-items:baseline; gap:.6em;
+    font-family:var(--font-struct); font-weight:600;
+    font-size:17px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink); margin:0 0 11px;
+  }
+  .lic-sec h3 .num{
+    font-family:var(--font-display); font-weight:700; font-size:20px;
+    color:var(--gold-deep); flex:none; line-height:1;
+  }
+  .lic-sec p{
+    font-family:var(--font-body); font-size:18px; line-height:1.5;
+    color:var(--ink); margin:0 0 11px; text-wrap:pretty;
+  }
+  .lic-sec p:last-child{ margin-bottom:0; }
+  .lic-sec strong{ font-weight:600; color:var(--ink); }
+
+  .lic-list{
+    list-style:none; margin:4px 0 11px; padding:0;
+  }
+  .lic-list li{
+    position:relative; font-family:var(--font-body); font-size:18px;
+    line-height:1.46; color:var(--ink); padding-left:1.5em; margin:0 0 8px;
+    text-wrap:pretty;
+  }
+  .lic-list li::before{
+    content:""; position:absolute; left:.35em; top:.62em;
+    width:6px; height:6px; background:var(--gold-deep); transform:rotate(45deg);
+  }
+  .lic-list li strong{ font-weight:600; }
+
+  /* pull-aside note (the "narrow exception") */
+  .lic-aside{
+    border-left:2px solid var(--gold-deep);
+    background:oklch(0.93 0.02 82 / .55);
+    padding:14px 18px; margin:14px 0 0;
+  }
+  .lic-aside p{ font-style:italic; font-size:17.5px; color:var(--ink-soft); margin:0; }
+  .lic-aside strong{ font-style:normal; color:var(--ink); }
+
+  /* dividers */
+  .lic-divider{ display:flex; align-items:center; justify-content:center; gap:11px; margin:34px 0 0; }
+  .lic-divider .ln{ height:1px; width:110px; background:linear-gradient(90deg, transparent, var(--gold-deep)); }
+  .lic-divider .ln.rev{ background:linear-gradient(90deg, var(--gold-deep), transparent); }
+  .lic-divider .dot{ width:6px; height:6px; background:var(--gold-deep); transform:rotate(45deg); }
+
+  /* colophon */
+  .lic-foot{
+    text-align:center; margin-top:34px;
+    font-family:var(--font-struct); font-size:11px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--gold-deep); line-height:1.7;
+  }
+
+  /* back link (screen only) */
+  .lic-back{
+    position:fixed; top:20px; left:22px; z-index:50;
+    display:inline-flex; align-items:center; gap:.5em;
+    font-family:var(--font-struct); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; text-decoration:none;
+    color:oklch(0.86 0.03 82);
+    background:oklch(0.18 0.014 64 / .92); backdrop-filter:blur(8px);
+    border:1px solid oklch(0.5 0.06 74 / .6); border-radius:999px;
+    padding:9px 17px; box-shadow:0 14px 30px -10px rgba(0,0,0,.7);
+    transition:.18s;
+  }
+  .lic-back:hover{ background:oklch(0.3 0.04 72); color:var(--gold-bright); }
+  .lic-back .arr{ font-size:14px; line-height:1; transform:translateY(-1px); }
+
+  @media (max-width:700px){
+    .doc-frame{ margin:0; border:none; box-shadow:none; padding:30px 18px 26px; }
+    .doc{ box-shadow:none; }
+    .lic-title{ font-size:38px; }
+    .lic-back{ top:12px; left:12px; }
+  }
+
+  @media print{
+    @page{ size:Letter; margin:0.7in; }
+    body{ background:none; padding:0; }
+    .doc{ width:100%; box-shadow:none; background:none; }
+    .doc-frame{ margin:0; border:none; box-shadow:none; padding:0; }
+    .lic-back{ display:none !important; }
+    .lic-sec{ break-inside:avoid; }
+    .lic-title{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+
+<a class="lic-back" href="Auto-Dungeon Generator.html"><span class="arr">&#8592;</span> Back to Generator</a>
+
+<div class="doc">
+  <div class="doc-frame">
+
+    <header class="lic-head">
+      <div class="lic-over">Terms of Use &amp; License Agreement</div>
+      <h1 class="lic-title">RollDvantage</h1>
+      <p class="lic-kicker">The terms that govern your use of the tool &mdash; and your full ownership of what you make with it.</p>
+      <div class="lic-meta">Copyright &copy; 2026 Terrestrial Origin LLC <span class="dot">&#10070;</span> All rights reserved <span class="dot">&#10070;</span> Last updated Jun 1, 2026</div>
+    </header>
+
+    <div class="lic-divider"><span class="ln"></span><span class="dot"></span><span class="ln rev"></span></div>
+
+    <section class="lic-sec">
+      <h3><span class="num">1</span> Your Content Is Yours &mdash; Always</h3>
+      <p><strong>Anything you create or generate using RollDvantage belongs entirely to you.</strong></p>
+      <p>This includes any dungeons, maps, encounters, characters, items, tables, descriptions, names, or other role-playing-game materials that you produce with RollDvantage &mdash; whether you generated them automatically with the tool&rsquo;s generators or wrote and built them yourself by hand.</p>
+      <p>You may use this content for any purpose, with no restriction and no obligation to us. Specifically, <strong>you are free to:</strong></p>
+      <ul class="lic-list">
+        <li>Use it in your own tabletop or online game sessions, public or private;</li>
+        <li>Modify, adapt, remix, and build on it however you like;</li>
+        <li>Distribute or share it for free;</li>
+        <li><strong>Sell it, publish it commercially, or include it in books, modules, supplements, products, or other works</strong> for profit;</li>
+        <li>Do all of the above without paying us any royalty, fee, or share, and without crediting RollDvantage (though a mention is always appreciated).</li>
+      </ul>
+      <p>We claim <strong>no ownership</strong> of and <strong>no license to</strong> the materials you create with RollDvantage. Your content is your property. We will never sell it, claim it, or restrict what you do with it.</p>
+      <div class="lic-aside">
+        <p><strong>One narrow exception:</strong> this grant covers the <em>materials you generate or author</em>. It does <strong>not</strong> give you the right to copy, extract, or resell RollDvantage&rsquo;s own software, source code, generators, underlying data tables, or built-in assets (see Sections 3&ndash;5). The output is yours; the machine that made it is ours.</p>
+      </div>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">2</span> The Software</h3>
+      <p>&ldquo;<strong>RollDvantage</strong>&rdquo; or the &ldquo;<strong>Software</strong>&rdquo; means the RollDvantage web application, including its source code, design, generators, algorithms, built-in data tables, assets that come with the software, and all related files, in any version, that we make available at our website or elsewhere.</p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">3</span> License to Use</h3>
+      <p>Subject to your compliance with this agreement, we grant you a <strong>personal, limited, non-exclusive, non-transferable, revocable license</strong> to access and use RollDvantage through your web browser or purchased desktop or mobile version of the program for your own personal or commercial role-playing-game purposes. That is, to generate and create RPG materials as described in Section 1.</p>
+      <p>This is a license to <strong>use</strong> the Software. It is <strong>not</strong> a sale or transfer of the Software itself, and it grants you no ownership of the Software or any rights to its code.</p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">4</span> Ownership of the Software</h3>
+      <p>RollDvantage, including all of its source code and all intellectual property rights in it, is and remains the exclusive property of Terrestrial Origin LLC. All rights not expressly granted to you in this agreement are reserved.</p>
+      <p>The fact that the Software can run in your browser, and that its code may therefore be visible or accessible through browser developer tools or similar means, <strong>does not</strong> place the code in the public domain, waive any copyright, or grant you any right to copy, reuse, or redistribute it. The code remains protected by copyright and by this agreement regardless of its technical visibility.</p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">5</span> What You May Not Do</h3>
+      <p>You agree that you will <strong>not</strong>, in whole or in part:</p>
+      <ul class="lic-list">
+        <li><strong>Copy, reproduce, or store</strong> the Software&rsquo;s source code, generators, data tables, or assets except as automatically occurs in your browser&rsquo;s normal operation for the purpose of using the Software;</li>
+        <li><strong>Redistribute, publish, sublicense, sell, rent, lease, or otherwise make the Software available</strong> to any third party;</li>
+        <li><strong>Pass off the Software, or any portion of it, as your own</strong> work or product, or remove, alter, or obscure any copyright, ownership, or attribution notices;</li>
+        <li><strong>Create derivative works</strong> based on the Software&rsquo;s code, or incorporate any portion of it into another application or product;</li>
+        <li><strong>Reverse engineer, decompile, de-obfuscate, or extract</strong> the Software&rsquo;s code, logic, generators, or data for the purpose of reproducing, reusing, or competing with it;</li>
+        <li><strong>Use automated means</strong> to scrape, harvest, or systematically download the Software&rsquo;s code, assets, or data tables.</li>
+      </ul>
+      <p>To be clear, none of these restrictions limit your rights to the <em>materials you create</em>, which are governed entirely by Section 1.</p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">6</span> No Warranty</h3>
+      <p>The Software is provided <strong>&ldquo;as is&rdquo; and &ldquo;as available,&rdquo; without warranty of any kind</strong>, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, accuracy, or non-infringement. We do not warrant that the Software will be uninterrupted, error-free, available at any particular time, or free of bugs, and we may change, suspend, or discontinue it at any time without notice.</p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">7</span> Limitation of Liability</h3>
+      <p>To the maximum extent permitted by law, Terrestrial Origin LLC will not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data, profits, or content, arising out of or related to your use of (or inability to use) the Software, even if advised of the possibility of such damages. Your sole remedy for dissatisfaction with the Software is to stop using it.</p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">8</span> Termination</h3>
+      <p>This license is effective until terminated. It terminates automatically if you breach any of its terms. We may also revoke or modify it at any time. Upon termination, you must stop using the Software. Sections 1, 4, 6, 7, and 9 survive termination &mdash; in particular, <strong>your ownership of materials you already created under Section 1 is permanent and is not affected by termination.</strong></p>
+    </section>
+
+    <section class="lic-sec">
+      <h3><span class="num">9</span> General</h3>
+      <p>This agreement is the entire agreement between you and us regarding the Software and supersedes any prior understandings. If any provision is found unenforceable, the rest remains in effect. Our failure to enforce any provision is not a waiver of it. This agreement is governed by the laws of the State of Iowa, USA, without regard to its conflict-of-laws rules.</p>
+    </section>
+
+    <div class="lic-divider"><span class="ln"></span><span class="dot"></span><span class="ln rev"></span></div>
+
+    <p class="lic-foot">Copyright &copy; 2026 Terrestrial Origin LLC<br />All rights reserved</p>
+
+  </div>
+</div>
+
+</body>
+</html>

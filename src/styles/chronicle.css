@@ -1,0 +1,305 @@
+/* ============================================================
+   THE GILDED CHRONICLE — Design System
+   A reusable stylesheet for printable, fillable "tome" documents:
+   questionnaires, worksheets, journals, character sheets.
+
+   Load order in any document:
+     1. The Google Fonts link (see _fonts snippet below / README)
+     2. <link rel="stylesheet" href="chronicle.css">
+     3. <script src="chronicle.js"></script>  (optional: scaling + persistence)
+
+   FONT LINK (paste into <head>):
+   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+   ============================================================ */
+
+:root{
+  /* ---- color: the gilded chronicle palette ---- */
+  --ink:         oklch(0.26 0.018 60);        /* warm near-black, primary text */
+  --ink-soft:    oklch(0.42 0.018 60);        /* muted ink, captions */
+  --parch:       oklch(0.952 0.014 84);       /* aged ivory page */
+  --parch-edge:  oklch(0.905 0.022 80);       /* darker vignette edge */
+  --gold:        oklch(0.66 0.094 78);        /* gilded accent */
+  --gold-deep:   oklch(0.52 0.084 70);        /* bronze, structural marks */
+  --gold-bright: oklch(0.80 0.10 84);         /* highlight on dark */
+  --rule:        oklch(0.66 0.05 78 / 0.45);  /* writing line */
+  --night:       oklch(0.205 0.016 66);       /* cover ground */
+  --night-2:     oklch(0.155 0.014 64);       /* cover deep */
+
+  /* ---- type ---- */
+  --font-display: "Cinzel Decorative", serif;   /* big titles, numerals */
+  --font-struct:  "Cinzel", serif;              /* labels, headings, UI */
+  --font-body:    "Cormorant Garamond", Georgia, serif; /* prose + answers */
+
+  /* ---- rhythm ---- */
+  --lh: 38px;                                   /* writing-line height */
+  --page-w: 8.5in;
+  --page-h: 11in;
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+
+body{
+  background:
+    radial-gradient(120% 90% at 50% 0%,
+      oklch(0.30 0.018 66) 0%,
+      oklch(0.165 0.014 64) 60%,
+      oklch(0.11 0.012 62) 100%) fixed;
+  font-family:var(--font-body);
+  color:var(--ink);
+  padding:40px 16px 90px;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------------- page shell ----------------
+   Each .page is wrapped in a .page-wrap by chronicle.js; on narrow
+   screens the whole page is scaled to fit (no sideways scroll). */
+.page-wrap{ width:100%; overflow:hidden; margin:0 auto 34px; }
+.page{
+  position:relative;
+  width:var(--page-w); height:var(--page-h);
+  margin:0 auto;
+  background:var(--parch);
+  overflow:hidden;
+  box-shadow:0 26px 60px -18px rgba(0,0,0,.7), 0 2px 0 rgba(0,0,0,.4);
+}
+
+/* aged-paper vignette + faint mottling — apply to interior pages via .sheet */
+.sheet::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(140% 120% at 50% 0%, transparent 55%, var(--parch-edge) 100%),
+    radial-gradient(60% 50% at 18% 88%, oklch(0.88 0.03 72 / .45), transparent 60%),
+    radial-gradient(50% 40% at 86% 14%, oklch(0.89 0.03 70 / .4),  transparent 60%);
+  mix-blend-mode:multiply;
+}
+
+/* ====================================================== COVER */
+.cover{
+  background:
+    radial-gradient(120% 80% at 50% 18%, var(--night) 0%, var(--night-2) 70%, oklch(0.115 0.012 62) 100%);
+  color:oklch(0.9 0.02 82);
+}
+.cover-frame{
+  position:absolute; inset:0.42in;
+  border:1px solid var(--gold-deep);
+  box-shadow:inset 0 0 0 5px var(--night), inset 0 0 0 6px oklch(0.5 0.07 72 / .6);
+  display:flex; flex-direction:column; align-items:center;
+  padding:0.7in 0.7in 0.62in;
+}
+.cover-corner{ position:absolute; width:26px; height:26px; }
+.cover-corner::before, .cover-corner::after{
+  content:""; position:absolute; background:var(--gold);
+}
+.cover-corner::before{ width:100%; height:1.5px; top:0; }
+.cover-corner::after{  width:1.5px; height:100%; left:0; }
+.cc-tl{ top:-1px; left:-1px; }
+.cc-tr{ top:-1px; right:-1px; transform:scaleX(-1); }
+.cc-bl{ bottom:-1px; left:-1px; transform:scaleY(-1); }
+.cc-br{ bottom:-1px; right:-1px; transform:scale(-1,-1); }
+
+.cover-top{ margin-top:0.5in; text-align:center; }
+
+.overline{
+  font-family:var(--font-struct); font-weight:500;
+  letter-spacing:.42em; text-transform:uppercase;
+  font-size:12px; color:var(--gold); padding-left:.42em;
+}
+
+/* decorative diamond rule — works on dark (cover) */
+.diamond-row{ display:flex; align-items:center; justify-content:center; gap:12px; margin:18px 0; }
+.diamond-row .ln{ width:60px; height:1px; background:linear-gradient(90deg, transparent, var(--gold)); }
+.diamond-row .ln.rev{ background:linear-gradient(90deg, var(--gold), transparent); }
+.diamond{ width:7px; height:7px; background:var(--gold); transform:rotate(45deg); }
+
+.cover-title{
+  flex:1; display:flex; flex-direction:column;
+  justify-content:center; align-items:center; text-align:center;
+}
+.cover-title h1{
+  font-family:var(--font-display); font-weight:900;
+  font-size:62px; line-height:1.04; margin:0;
+  color:transparent;
+  background:linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
+  -webkit-background-clip:text; background-clip:text;
+  text-shadow:0 1px 0 rgba(0,0,0,.35);
+  letter-spacing:.01em;
+}
+.cover-sub{
+  font-style:italic; font-size:22px; line-height:1.4; max-width:5in;
+  margin:24px auto 0; color:oklch(0.82 0.02 82);
+}
+.cover-flourish{
+  font-family:var(--font-struct); font-size:19px; letter-spacing:.5em;
+  color:var(--gold); margin-top:26px; padding-left:.5em;
+}
+
+/* labelled fill-in fields on the dark cover */
+.cover-fields{
+  width:100%; max-width:5.2in;
+  display:grid; grid-template-columns:1fr 1fr; gap:20px 30px;
+  margin-bottom:0.2in;
+}
+.cover-fields .field.wide{ grid-column:1 / -1; }
+.cover-fields label{
+  display:block; font-family:var(--font-struct); font-size:10px;
+  letter-spacing:.28em; text-transform:uppercase; color:var(--gold);
+  margin-bottom:7px; padding-left:.28em;
+}
+.cover-fields input{
+  width:100%; background:transparent; border:none;
+  border-bottom:1px solid oklch(0.55 0.05 74 / .7);
+  color:oklch(0.92 0.02 84); font-family:var(--font-body);
+  font-size:20px; padding:2px 2px 6px; outline:none;
+}
+.cover-fields input:focus{ border-bottom-color:var(--gold-bright); }
+.cover-fields input::placeholder{ color:oklch(0.6 0.02 80 / .5); font-style:italic; }
+
+/* ====================================================== INTERIOR */
+.frame{
+  position:absolute; inset:0.55in;
+  border:1px solid oklch(0.7 0.04 76 / .55);
+  box-shadow:inset 0 0 0 3px oklch(0.78 0.04 80 / .25);
+  padding:0.42in 0.5in;
+  display:flex; flex-direction:column;
+}
+
+/* section header: numeral + title + subtitle + divider */
+.sec-head{ text-align:center; margin-bottom:18px; }
+.sec-head .numeral{
+  font-family:var(--font-display); font-weight:700;
+  font-size:26px; color:var(--gold-deep); line-height:1;
+}
+.sec-head h2{
+  font-family:var(--font-struct); font-weight:600;
+  font-size:25px; letter-spacing:.12em; text-transform:uppercase;
+  margin:8px 0 0; color:var(--ink);
+}
+.sec-head .sec-sub{
+  font-style:italic; font-size:16px; color:var(--ink-soft); margin:5px 0 0;
+}
+
+/* decorative divider — bronze, for use on parchment */
+.sec-divider{ display:flex; align-items:center; justify-content:center; gap:11px; margin:13px 0 4px; }
+.sec-divider .ln{ height:1px; width:88px; background:linear-gradient(90deg, transparent, var(--gold-deep)); }
+.sec-divider .ln.rev{ background:linear-gradient(90deg, var(--gold-deep), transparent); }
+.sec-divider .dot{ width:6px; height:6px; background:var(--gold-deep); transform:rotate(45deg); }
+
+/* numbered question list — auto-numbers via CSS counter */
+.qlist{ list-style:none; margin:0; padding:0; counter-reset:q; flex:1; }
+.q{ margin:0 0 16px; counter-increment:q; }
+.q:last-child{ margin-bottom:0; }
+.q-text{
+  display:flex; gap:10px; align-items:baseline;
+  font-size:17.5px; line-height:1.32; color:var(--ink); margin:0 0 7px;
+}
+.q-text::before{
+  content:counter(q, decimal);
+  font-family:var(--font-struct); font-weight:600; font-size:12px;
+  color:var(--gold-deep); min-width:18px; text-align:right;
+  transform:translateY(-1px); flex:none;
+}
+
+/* writing lines — ruled fill-in area. Use .l2 / .l3 for height. */
+.lines{
+  background-image:repeating-linear-gradient(
+    to bottom,
+    transparent 0, transparent calc(var(--lh) - 1.2px),
+    var(--rule) calc(var(--lh) - 1.2px), var(--rule) var(--lh));
+  background-position:0 0;
+  font-family:var(--font-body); font-size:18px;
+  line-height:var(--lh); color:var(--ink);
+  padding:0 4px; outline:none;
+  margin-left:28px;
+}
+.lines:focus{ background-color:oklch(0.86 0.04 84 / .35); }
+.l1{ height:calc(var(--lh)*1); }
+.l2{ height:calc(var(--lh)*2); }
+.l3{ height:calc(var(--lh)*3); }
+.l4{ height:calc(var(--lh)*4); }
+
+/* running foot */
+.page-foot{
+  position:absolute; bottom:0.34in; left:0; right:0; text-align:center;
+  font-family:var(--font-struct); font-size:9px; letter-spacing:.32em;
+  text-transform:uppercase; color:var(--gold-deep);
+}
+
+/* ---------------- screen-only toolbar ---------------- */
+.toolbar{
+  position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+  display:flex; gap:8px; z-index:50;
+  background:oklch(0.18 0.014 64 / .92); backdrop-filter:blur(8px);
+  border:1px solid oklch(0.5 0.06 74 / .6); border-radius:999px;
+  padding:7px 9px; box-shadow:0 14px 30px -10px rgba(0,0,0,.7);
+}
+.toolbar button{
+  font-family:var(--font-struct); font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; cursor:pointer;
+  background:transparent; color:oklch(0.86 0.03 82);
+  border:1px solid transparent; border-radius:999px;
+  padding:8px 16px; transition:.18s;
+}
+.toolbar button:hover{ background:oklch(0.3 0.04 72); color:var(--gold-bright); }
+.toolbar button.primary{
+  background:linear-gradient(180deg, var(--gold), var(--gold-deep));
+  color:oklch(0.16 0.014 64); font-weight:600;
+}
+.toolbar button.primary:hover{ filter:brightness(1.08); }
+.toolbar .sep{ width:1px; background:oklch(0.5 0.05 74 / .5); margin:4px 2px; }
+
+/* ============ SMALL SCREENS: reflow instead of scaling ============ */
+@media (max-width:700px){
+  body{ padding:16px 12px 86px; }
+
+  .page-wrap{ width:100%; overflow:visible; height:auto !important; margin:0; position:relative; }
+  .page-wrap + .page-wrap{ margin-top:12px; padding-top:12px; }
+  .page-wrap + .page-wrap::before{
+    content:""; position:absolute; top:0; left:8%; right:8%; height:1px;
+    background:linear-gradient(90deg, transparent, var(--gold-deep), transparent);
+  }
+
+  .page{
+    width:100% !important; height:auto !important;
+    transform:none !important; margin:0 !important;
+    box-shadow:none;
+  }
+  .sheet::before{ display:none; }
+  .page-foot{ display:none; }
+
+  .frame{
+    position:static; inset:auto; border:none; box-shadow:none;
+    padding:4px 10px 0;
+  }
+  .sec-head{ margin-bottom:14px; padding:1em 6px 0; }
+  .sec-head .numeral{ display:inline; margin-right:.42em; vertical-align:baseline; }
+  .sec-head h2{ display:inline; margin:0; }
+  .q{ margin-bottom:20px; }
+
+  .cover{ min-height:auto; }
+  .cover-frame{
+    position:relative; inset:auto; margin:0; min-height:80vh;
+    padding:34px 20px 30px;
+  }
+  .cover-top{ margin-top:8px; }
+  .cover-title h1{ font-size:42px; }
+  .cover-sub{ font-size:18px; max-width:none; margin-top:18px; }
+  .cover-fields{ grid-template-columns:1fr; max-width:none; gap:18px; }
+}
+
+/* ---------------- print ---------------- */
+@page{ size:Letter; margin:0; }
+@media print{
+  body{ background:none; padding:0; }
+  .page-wrap{ display:contents !important; }
+  .page{
+    margin:0 !important; box-shadow:none; width:8.5in; height:11in;
+    transform:none !important; margin-left:0 !important;
+    page-break-after:always; break-after:page;
+  }
+  .page:last-child{ page-break-after:auto; }
+  .toolbar{ display:none !important; }
+  .lines:focus{ background-color:transparent; }
+  .cover input, .lines{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .cover-fields input{ color:black; }
+}
