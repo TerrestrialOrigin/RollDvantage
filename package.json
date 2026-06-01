@@ -18,7 +18,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "validate": "bash ../scripts/validate-all.sh",
+    "validate": "bash scripts/validate-all.sh",
     "clean": "rm -rf dist && rm -rf dist-electron"
   },
   "build": {
