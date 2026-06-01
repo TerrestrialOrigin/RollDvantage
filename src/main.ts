@@ -1,6 +1,6 @@
 import './styles/chronicle.css';
-import { initDungeon } from './dungeon';
-import { initChronicle } from './chronicle';
+import { initDungeon } from './dungeon/initDungeon';
+import { initChronicle } from './chronicle/initChronicle';
 
 /* The original page loaded these as classic <script> tags placed at the
    bottom of <body>. With Vite + ES modules the entry runs after the DOM
