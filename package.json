@@ -8,7 +8,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run clean && vite --force",
     "build-web": "tsc -b && vite build",
     "build-android": "tsc -b && vite build &&npx cap sync android && npx cap open android",
     "build-ios": "tsc -b && vite build &&npx cap sync ios && npx cap open ios",
