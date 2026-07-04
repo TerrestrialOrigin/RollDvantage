@@ -1,11 +1,17 @@
 /* ============================================================
    Dungeon file persistence.
 
-   Pure core (serialize / filename / parse+validate) is unit-tested; the DOM
-   wrappers (download via an <a>, read via FileReader) are thin. Validation
-   matches the original (reject anything missing grid/floor/markers).
+   Pure core (serialize / filename / parse+validate+migrate) is unit-tested; the
+   DOM wrappers (download via an <a>, read via FileReader) are thin. This is the
+   app's untrusted-input boundary: `isValidDungeon` structurally validates a
+   parsed file (either secret-path schema), and `migrateDungeon` normalizes the
+   documented legacy SecretPath L-schema to the current straight-centerline
+   schema and stamps the file version — so nothing past this boundary ever sees
+   a malformed or legacy shape.
    ============================================================ */
-import type { Dungeon } from '../model/types';
+import type { Dungeon, SecretPath, LegacySecretPath } from '../model/types';
+
+export const DUNGEON_SCHEMA_VERSION = 1;
 
 export class InvalidDungeonFileError extends Error {
   constructor() {
@@ -25,13 +31,112 @@ export function dungeonFilename(dungeon: Dungeon): string {
   return slug + '-' + (dungeon.seed >>> 0).toString(16).toUpperCase() + '.dungeon';
 }
 
-/** Minimal shape check the renderer relies on. */
-export function isValidDungeon(value: unknown): value is Dungeon {
-  const candidate = value as Partial<Dungeon> | null;
-  return !!candidate && !!candidate.grid && !!candidate.floor && !!candidate.markers;
+/* ---------- structural validation helpers ---------- */
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Parse + validate dungeon JSON. Throws InvalidDungeonFileError on bad input. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** A rows×columns matrix of numbers (the floor / secretFloor occupancy grids). */
+function isNumberMatrix(value: unknown, rows: number, columns: number): boolean {
+  if (!Array.isArray(value) || value.length !== rows) return false;
+  return value.every((row) => Array.isArray(row) && row.length === columns && row.every((cell) => isFiniteNumber(cell)));
+}
+
+function isValidRoom(value: unknown): boolean {
+  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.w) && isFiniteNumber(value.h);
+}
+
+function isValidMarker(value: unknown): boolean {
+  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && typeof value.type === 'string';
+}
+
+function isValidCorridorNote(value: unknown): boolean {
+  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y);
+}
+
+function isModernSecretPath(value: unknown): value is SecretPath {
+  return isRecord(value) && isFiniteNumber(value.x1) && isFiniteNumber(value.y1) && isFiniteNumber(value.x2) && isFiniteNumber(value.y2);
+}
+
+function isLegacySecretPath(value: unknown): value is LegacySecretPath {
+  return isRecord(value) && isFiniteNumber(value.ax) && isFiniteNumber(value.ay) && isFiniteNumber(value.bx) && isFiniteNumber(value.by);
+}
+
+/** Secret paths validate in either schema; `migrateDungeon` normalizes afterwards. */
+function isValidSecretPath(value: unknown): boolean {
+  return isModernSecretPath(value) || isLegacySecretPath(value);
+}
+
+function isArrayOf(value: unknown, itemCheck: (item: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.every(itemCheck);
+}
+
+function hasValidGrid(candidate: Record<string, unknown>): candidate is Record<string, unknown> & { grid: { gw: number; gh: number; cell: number } } {
+  const grid = candidate.grid;
+  return isRecord(grid) && isFiniteNumber(grid.gw) && isFiniteNumber(grid.gh) && isFiniteNumber(grid.cell);
+}
+
+/** Optional fields must be absent (undefined/null, as older files and the
+    generator's empty mode emit) or valid; presence with the wrong shape rejects. */
+function hasValidOptionalFields(candidate: Record<string, unknown>, rows: number, columns: number): boolean {
+  if (candidate.secretFloor != null && !isNumberMatrix(candidate.secretFloor, rows, columns)) return false;
+  if (candidate.secretRooms != null && !isArrayOf(candidate.secretRooms, isValidRoom)) return false;
+  if (candidate.secretPaths != null && !isArrayOf(candidate.secretPaths, isValidSecretPath)) return false;
+  if (candidate.corridorNotes != null && !isArrayOf(candidate.corridorNotes, isValidCorridorNote)) return false;
+  return true;
+}
+
+/**
+ * Structural validation of untrusted input. Verifies everything editing and
+ * rendering rely on: finite seed/grid numbers, a grid-shaped numeric floor,
+ * and correctly-shaped feature arrays (secret paths in either schema).
+ */
+export function isValidDungeon(value: unknown): value is Dungeon {
+  if (!isRecord(value)) return false;
+  if (!isFiniteNumber(value.seed)) return false;
+  if (!hasValidGrid(value)) return false;
+  const { gw: columns, gh: rows } = value.grid;
+  if (!isNumberMatrix(value.floor, rows, columns)) return false;
+  if (!isArrayOf(value.rooms, isValidRoom)) return false;
+  if (!isArrayOf(value.markers, isValidMarker)) return false;
+  return hasValidOptionalFields(value, rows, columns);
+}
+
+/* ---------- legacy migration ---------- */
+
+/** One straight segment per leg of a legacy L-path (degenerate legs dropped). */
+function legacyPathToSegments(path: LegacySecretPath): SecretPath[] {
+  const corner = path.horizFirst
+    ? { x: path.bx, y: path.ay }  // horizontal leg first: corner shares the start row
+    : { x: path.ax, y: path.by }; // vertical leg first: corner shares the start column
+  const legs: SecretPath[] = [
+    { x1: path.ax, y1: path.ay, x2: corner.x, y2: corner.y },
+    { x1: corner.x, y1: corner.y, x2: path.bx, y2: path.by },
+  ];
+  return legs.filter((leg) => leg.x1 !== leg.x2 || leg.y1 !== leg.y2);
+}
+
+/**
+ * Normalize a structurally valid dungeon to the current schema: legacy secret
+ * paths become straight centerline segments, and the schema version is stamped.
+ * Consumers past the load boundary may assume the modern shape.
+ */
+export function migrateDungeon(raw: Dungeon): Dungeon {
+  const rawPaths = (raw.secretPaths ?? []) as unknown[];
+  if (rawPaths.length > 0) {
+    raw.secretPaths = rawPaths.flatMap((path) =>
+      isModernSecretPath(path) ? [path] : legacyPathToSegments(path as LegacySecretPath));
+  }
+  raw.version = DUNGEON_SCHEMA_VERSION;
+  return raw;
+}
+
+/** Parse + validate + migrate dungeon JSON. Throws InvalidDungeonFileError on bad input. */
 export function parseDungeonText(text: string): Dungeon {
   let parsed: unknown;
   try {
@@ -40,7 +145,7 @@ export function parseDungeonText(text: string): Dungeon {
     throw new InvalidDungeonFileError();
   }
   if (!isValidDungeon(parsed)) throw new InvalidDungeonFileError();
-  return parsed;
+  return migrateDungeon(parsed);
 }
 
 /** Trigger a browser download of the dungeon as a .dungeon file. */

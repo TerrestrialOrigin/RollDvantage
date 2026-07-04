@@ -54,7 +54,12 @@ export function relabel(dungeon: Dungeon | null): AnnotationEntry[] {
   return annotations;
 }
 
-/** HTML-escape user text destined for innerHTML. */
+/** HTML-escape user text for both text-node and attribute contexts. */
 export function esc(value: unknown): string {
-  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

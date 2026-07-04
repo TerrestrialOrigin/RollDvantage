@@ -35,24 +35,32 @@ export class DungeonStore {
   private current: Dungeon | null = null;
   private dirty = false;
   private level: number;
+  /** Cached snapshot: rebuilt only inside mutators (useSyncExternalStore contract). */
+  private state: DungeonState;
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly history: History, private readonly storage: KeyValueStore) {
     const stored = parseInt(this.storage.getItem(LEVEL_STORAGE_KEY) ?? '3', 10) || 3;
     this.level = clampLevel(stored);
+    this.state = { dungeon: this.current, dirty: this.dirty, level: this.level };
   }
 
   getCurrent(): Dungeon | null { return this.current; }
   isDirty(): boolean { return this.dirty; }
-  setDirty(value: boolean): void { this.dirty = value; }
+  setDirty(value: boolean): void { this.dirty = value; this.rebuildState(); }
   getLevel(): number { return this.level; }
 
-  getState(): DungeonState { return { dungeon: this.current, dirty: this.dirty, level: this.level }; }
+  getState(): DungeonState { return this.state; }
+
+  private rebuildState(): void {
+    this.state = { dungeon: this.current, dirty: this.dirty, level: this.level };
+  }
 
   /** Clamp + persist the level. Does not regenerate — the caller decides that. */
   setLevel(value: number): void {
     this.level = clampLevel(value);
     this.storage.setItem(LEVEL_STORAGE_KEY, String(this.level));
+    this.rebuildState();
   }
 
   /** React/useSyncExternalStore-shaped subscription; returns an unsubscribe. */
@@ -64,28 +72,36 @@ export class DungeonStore {
   private notify(): void { this.listeners.forEach((listener) => listener()); }
 
   /**
-   * The single chokepoint after any map mutation: relabel, re-render (notify),
-   * mark dirty, and record history — in the original order.
+   * The single chokepoint after any map mutation: relabel, mark dirty, record
+   * history, then re-render (notify) — state is fully settled before listeners
+   * run, so a subscriber reading synchronously never sees stale dirty/canUndo.
    */
   refresh(): void {
-    if (this.current) relabel(this.current);
-    this.notify();
+    const dungeon = this.current;
+    if (!dungeon) return;
+    relabel(dungeon);
     this.dirty = true;
-    this.history.record(this.current!);
+    this.history.record(dungeon);
+    this.rebuildState();
+    this.notify();
   }
 
-  /** Adopt a freshly generated/loaded dungeon: refresh, then clear the dirty flag. */
+  /** Adopt a freshly generated/loaded dungeon: baseline history, not dirty. */
   loadFresh(dungeon: Dungeon): void {
     this.current = dungeon;
-    this.refresh();
+    relabel(dungeon);
+    this.history.record(dungeon);
     this.dirty = false;
+    this.rebuildState();
+    this.notify();
   }
 
   /** Restore a snapshot (undo/redo): relabel + re-render WITHOUT recording history. */
   restore(dungeon: Dungeon): void {
     this.current = dungeon;
-    if (this.current) relabel(this.current);
-    this.notify();
+    relabel(dungeon);
     this.dirty = true;
+    this.rebuildState();
+    this.notify();
   }
 }

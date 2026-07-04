@@ -56,14 +56,8 @@ export function buildSVG(dungeon: Dungeon, options: RenderOptions): string {
   // secret overlays (DM only): dashed gold passage centerlines + room outlines
   if (options.secret) {
     (dungeon.secretPaths ?? []).forEach(function (secretPath) {
-      let pathData: string;
-      if (secretPath.x1 !== undefined) {
-        pathData = 'M' + (secretPath.x1 * cell + cell / 2) + ' ' + (secretPath.y1! * cell + cell / 2) + 'L' + (secretPath.x2! * cell + cell / 2) + ' ' + (secretPath.y2! * cell + cell / 2);
-      } else { // legacy L-schema files
-        const ax = secretPath.ax! * cell + cell / 2, ay = secretPath.ay! * cell + cell / 2, bx = secretPath.bx! * cell + cell / 2, by = secretPath.by! * cell + cell / 2;
-        pathData = secretPath.horizFirst ? ('M' + ax + ' ' + ay + 'L' + bx + ' ' + ay + 'L' + bx + ' ' + by)
-          : ('M' + ax + ' ' + ay + 'L' + ax + ' ' + by + 'L' + bx + ' ' + by);
-      }
+      // Legacy L-schema paths are migrated to straight centerlines at load time.
+      const pathData = 'M' + (secretPath.x1 * cell + cell / 2) + ' ' + (secretPath.y1 * cell + cell / 2) + 'L' + (secretPath.x2 * cell + cell / 2) + ' ' + (secretPath.y2 * cell + cell / 2);
       svg += '<path d="' + pathData + '" fill="none" stroke="' + GOLD + '" stroke-width="2.4" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" opacity="0.95"/>';
     });
     (dungeon.secretRooms ?? []).forEach(function (room) {

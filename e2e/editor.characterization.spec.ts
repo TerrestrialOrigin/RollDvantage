@@ -97,6 +97,47 @@ test('rejects an invalid file with an alert and leaves the dungeon unchanged (de
   await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore);
 });
 
+test('rejects a structurally hostile file at the boundary and stays editable (denial)', async ({ page }) => {
+  /* This shape passed the old truthy-check "validation" (grid/floor/markers all
+     truthy) and crashed deep inside editing. It must now be rejected at load. */
+  await page.setInputFiles('#file-load', FIXTURE);
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  const markersBefore = await page.locator('#dm-map .mk').count();
+
+  let alerted = '';
+  page.once('dialog', (dialog) => { alerted = dialog.message(); dialog.accept(); });
+
+  await page.setInputFiles('#file-load', {
+    name: 'hostile.dungeon',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"seed":1,"grid":{"gw":2,"gh":1,"cell":24},"floor":"x","markers":{}}'),
+  });
+
+  await expect.poll(() => alerted).toContain('not a valid RollDvantage dungeon');
+  // state unchanged and the editor still works: place a marker via the legend drag
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore);
+
+  const point = await page.evaluate(() => {
+    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
+    const rect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svgBox = svg.getBoundingClientRect();
+    const viewBox = svg.viewBox.baseVal;
+    const scaleX = svgBox.width / viewBox.width;
+    const scaleY = svgBox.height / viewBox.height;
+    const centerX = parseFloat(rect.getAttribute('x')!) + parseFloat(rect.getAttribute('width')!) / 2;
+    const centerY = parseFloat(rect.getAttribute('y')!) + parseFloat(rect.getAttribute('height')!) / 2;
+    return { x: svgBox.left + centerX * scaleX, y: svgBox.top + centerY * scaleY };
+  });
+  const legend = page.locator('.legend-item', { has: page.locator('[data-icon="monster"]') }).first();
+  const legendBox = (await legend.boundingBox())!;
+  await page.mouse.move(legendBox.x + legendBox.width / 2, legendBox.y + legendBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(point.x, point.y, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore + 1);
+});
+
 test('save triggers a .dungeon download', async ({ page }) => {
   await page.setInputFiles('#file-load', FIXTURE);
   const downloadPromise = page.waitForEvent('download');

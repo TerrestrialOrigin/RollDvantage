@@ -23,14 +23,14 @@ as a human would.
 ### 2. Structure-editing draw gestures (rooms / corridors / delete)
 - **Spec:** `dungeon-editor` → "Edit dungeon structure" (add room, delete removes orphaned features, Esc exits a mode) and the default-tool drags.
 - **Code:** `src/dungeon/controllers/structureModeController.ts`; mutations in `src/dungeon/editing/structureOps.ts`.
-- **Covered:** `commitRoom` / `commitDelete` (orphan cleanup) as pure ops (`editing.test.ts`).
+- **Covered:** `commitRoom` / `commitDelete` (orphan cleanup, **and secret-room/path/marker/secret-floor cleanup** — added in `harden-domain-core-and-persistence`) as pure ops (`editing.test.ts`).
 - **Gap:** the pointer gestures — Room rubber-band, Corridor click-start/click-end (+ live preview), Delete drag, default-tool left-drag (corridor vs room), right-drag erase, and `Esc` to exit — are not driven in a browser.
 - **Add:** E2E covering: enter Room mode → drag rectangle → room appears; Corridor mode → click two cells → corridor appears; Delete mode → drag → region clears; `Esc` deactivates the mode (button loses `.active`, hint hides).
 
 ### 3. Secret conversion via UI (drag (S) + context menu)
 - **Spec:** `dungeon-editor` → "Convert features to and from secret".
 - **Code:** `secretOps.ts` (logic), `dragPlaceController.ts` (drop/move (S)), `contextMenuController.ts` (Make/Make-Not Secret).
-- **Covered:** `convertSecretAt` / `unconvertSecret` inverse property as pure ops (`editing.test.ts`).
+- **Covered:** `convertSecretAt` / `unconvertSecret` inverse property as pure ops (`editing.test.ts`), for **both rooms and corridor runs** (corridor round-trip added in `harden-domain-core-and-persistence`).
 - **Gap:** no E2E that drops the (S) legend icon on a room/corridor and asserts it appears on the DM map but not the player map (and the reverse).
 - **Add:** E2E asserting a secret room/passage is DM-only (`#dm-map` shows the dashed gold outline / `(S)` badge; `#player-map` does not).
 
@@ -50,10 +50,10 @@ as a human would.
 - **Gap:** no test that *edits* the name on the DM map and asserts the player copy + running foot-name update and the dungeon object's `name` changes (and persists through Save).
 
 ### 6. Chronicle behaviour (scaling + field persistence + clear)
-- **Spec:** `dungeon-editor` → "Chronicle page scaling and field persistence".
+- **Spec:** `chronicle-field-persistence` (created in `harden-domain-core-and-persistence`) + page scaling.
 - **Code:** `src/chronicle/pageScaling.ts`, `fieldPersistence.ts`, `chronicleToolbar.ts`.
-- **Covered:** none directly (split verbatim from the original).
-- **Add:** a jsdom unit test for `setupFieldPersistence` (type into a `[data-key]` field → value saved under the namespaced key → restored on re-init; `clearAll` wipes it). Page scaling can stay E2E-only or be left as a visual check.
+- **Covered:** ✅ `setupFieldPersistence` fully unit-tested (`fieldPersistence.test.ts`, added in `harden-domain-core-and-persistence`): type → namespaced save → restore on re-init → `clearAll`, plus throwing-storage tolerance and markup-neutralized restore.
+- **Remaining gap:** page scaling (`pageScaling.ts` `fit()` small-screen branch) stays E2E-only / untested — scheduled for the configs-and-test-gaps change.
 
 ## Low priority
 
