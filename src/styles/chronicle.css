@@ -34,6 +34,9 @@
   --lh: 38px;                                   /* writing-line height */
   --page-w: 8.5in;
   --page-h: 11in;
+  /* decorative frame margin, proportional to the page (0.55in at Letter) so the
+     border inset scales with the selected page size */
+  --page-margin: calc(var(--page-w) * 0.0647);
 }
 
 *{ box-sizing:border-box; }
@@ -157,7 +160,7 @@ body{
 
 /* ====================================================== INTERIOR */
 .frame{
-  position:absolute; inset:0.55in;
+  position:absolute; inset:var(--page-margin);
   border:1px solid oklch(0.7 0.04 76 / .55);
   box-shadow:inset 0 0 0 3px oklch(0.78 0.04 80 / .25);
   padding:0.42in 0.5in;
@@ -287,19 +290,117 @@ body{
   .cover-fields{ grid-template-columns:1fr; max-width:none; gap:18px; }
 }
 
-/* ---------------- print ---------------- */
-@page{ size:Letter; margin:0; }
+/* ---------------- print ----------------
+   Cross-browser note: Chrome honours `@page{ size; margin }` and maps a fixed
+   8.5in×11in .page onto the sheet, so the on-screen absolutely-positioned .frame
+   fills the sheet and supplies the border + margin. Firefox (in the real print
+   pipeline) does the opposite on nearly every count: it IGNORES the CSS page size
+   and prints to the OS default paper (e.g. A4); it will NOT stretch a block to a
+   fixed / vh / % sheet height, so the absolute .frame collapses to content height
+   at the top of the sheet — losing its border and margin; and a page wider than
+   the paper triggers shrink-to-fit, which wrecks the layout and spills content
+   onto extra sheets.
+
+   So the printed layout here is made engine- and paper-agnostic:
+   • The decorative page border is drawn by a position:fixed overlay
+     (`body::after`). A fixed box is resolved against the PAGE BOX and repeats on
+     every printed sheet in both engines, so it fills the real sheet whatever the
+     paper size — the one reliable way to get a full-sheet frame in Firefox.
+   • The content .frame flows normally (static) with a padding that seats it just
+     inside the border, top-aligned, identically in both engines.
+   • width:auto (never wider than the paper) avoids Firefox's shrink-to-fit.
+   This is scoped to `:not(.pdf-bleed)`; the full-bleed PDF export keeps the
+   original absolute-frame model (see index.html). */
+/* Page size tracks the selected geometry (Chrome honours @page size incl. var();
+   Firefox ignores it and prints the dialog paper — print auto-fits either way). */
+@page{ size: var(--page-w) var(--page-h); margin:0; }
 @media print{
-  body{ background:none; padding:0; }
+  body{ background:none; padding:0; margin:0; }
+
+  /* Keep the section header stacked (numeral over title) in print. A narrow
+     print viewport can otherwise trigger the ≤700px inline reflow — Firefox put
+     "Depth 1" and the dungeon name on one line. */
+  .sec-head .numeral{ display:block; margin-right:0; }
+  .sec-head h2{ display:block; margin:8px 0 0; }
+
+  /* one section per sheet — see the break model note below */
   .page-wrap{ display:contents !important; }
   .page{
-    margin:0 !important; box-shadow:none; width:8.5in; height:11in;
+    margin:0 !important; box-shadow:none;
     transform:none !important; margin-left:0 !important;
+    /* break-AFTER every page, then exempt only the real last page (.sheet-last,
+       marked on the document's final section) so there is no trailing blank. NOT
+       break-before — Firefox keeps a forced break before the first page, printing
+       a blank leading sheet. And NOT `.page:last-child` for the exemption — every
+       .page is the sole child of its own .page-wrap, so that matched every page
+       and cancelled all breaks (Chrome hid it via exact-height pagination). */
     page-break-after:always; break-after:page;
   }
-  .page:last-child{ page-break-after:auto; }
+  .page.sheet-last{ page-break-after:auto; break-after:auto; }
+
   .toolbar{ display:none !important; }
   .lines:focus{ background-color:transparent; }
   .cover input, .lines{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .cover-fields input{ color:black; }
+
+  /* ---- normal print (not the full-bleed export): fixed border + flowed frame ---- */
+  html:not(.pdf-bleed) .page{
+    position:static !important; width:100% !important; height:auto !important;
+    overflow:visible !important; background:none !important;
+    /* width:100% == the page box (never wider, so no Firefox shrink-to-fit); it
+       must FILL the sheet width, or Firefox collapses the two-column Contents Key
+       grid to one column and the content doubles in height and overflows. */
+  }
+  html:not(.pdf-bleed) .frame{
+    position:static !important; inset:auto !important;
+    border:none !important; box-shadow:none !important;
+    margin:0 !important; padding:0.82in 0.8in 0.9in !important;
+  }
+  /* the decorative page frame, painted per sheet against the page box */
+  html:not(.pdf-bleed) body::after{
+    content:""; position:fixed; top:0.5in; left:0.5in; right:0.5in; bottom:0.5in;
+    border:1px solid oklch(0.62 0.05 74);
+    box-shadow:inset 0 0 0 3px oklch(0.80 0.045 82 / .45);
+    z-index:9998; pointer-events:none;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  /* running foot pinned to the sheet, repeated per page like the border */
+  html:not(.pdf-bleed) .page-foot{
+    position:fixed !important; left:0; right:0; bottom:0.66in;
+  }
 }
+
+/* ---------------- page-size control (screen chrome, top-right) ---------------- */
+.page-size-control{ position:fixed; top:18px; right:20px; z-index:60; font-family:var(--font-struct); }
+.ps-toggle{
+  display:flex; align-items:center; justify-content:center;
+  width:42px; height:42px; border-radius:50%; cursor:pointer;
+  background:oklch(0.18 0.014 64 / .92); color:oklch(0.86 0.03 82);
+  border:1px solid oklch(0.5 0.06 74 / .6); backdrop-filter:blur(8px);
+  box-shadow:0 10px 24px -10px rgba(0,0,0,.7);
+}
+.ps-toggle:hover{ color:var(--gold-bright); border-color:var(--gold); }
+.ps-popup{
+  position:absolute; top:52px; right:0; width:min(280px, calc(100vw - 40px));
+  background:oklch(0.18 0.014 64 / .96); backdrop-filter:blur(8px);
+  border:1px solid oklch(0.5 0.06 74 / .6); border-radius:14px;
+  padding:14px; box-shadow:0 18px 40px -14px rgba(0,0,0,.8);
+  color:oklch(0.86 0.03 82);
+}
+.ps-popup[hidden]{ display:none; }
+.ps-title{ font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
+.ps-presets{ display:flex; gap:6px; margin-bottom:12px; }
+.ps-presets button{
+  flex:1; padding:8px 0; font-family:var(--font-struct); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; cursor:pointer; border-radius:8px;
+  background:transparent; color:oklch(0.86 0.03 82); border:1px solid oklch(0.5 0.06 74 / .5);
+}
+.ps-presets button:hover{ color:var(--gold-bright); border-color:var(--gold); }
+.ps-presets button.active{ background:linear-gradient(180deg, var(--gold), var(--gold-deep)); color:oklch(0.16 0.014 64); font-weight:600; border-color:transparent; }
+.ps-custom label{ display:flex; align-items:center; gap:6px; font-size:11px; flex-wrap:wrap; color:oklch(0.8 0.03 82); }
+.ps-custom input[type=number]{ width:56px; padding:5px 6px; background:oklch(0.12 0.012 62); color:oklch(0.9 0.02 82); border:1px solid oklch(0.5 0.05 74 / .5); border-radius:6px; font-family:var(--font-body); }
+.ps-unit{ padding:5px; background:oklch(0.12 0.012 62); color:oklch(0.9 0.02 82); border:1px solid oklch(0.5 0.05 74 / .5); border-radius:6px; }
+.ps-apply{ padding:6px 12px; cursor:pointer; border-radius:6px; background:linear-gradient(180deg, var(--gold), var(--gold-deep)); color:oklch(0.16 0.014 64); font-weight:600; border:1px solid transparent; font-family:var(--font-struct); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+.ps-msg{ margin-top:8px; font-family:var(--font-body); font-style:italic; font-size:13px; color:oklch(0.78 0.09 45); min-height:1em; }
+@media print{ .page-size-control{ display:none !important; } }
+@media (max-width:760px){ .page-size-control{ top:12px; right:12px; } }

@@ -25,10 +25,16 @@
   }
 
   .map-wrap{ text-align:center; flex:1; display:flex; flex-direction:column; align-items:center; }
+  /* Maps scale to fill the framed width so content resizes with the page size. */
+  #dm-map, #player-map{ width:100%; }
   .dmap{
-    width:510px; height:auto; display:block;
+    width:100%; height:auto; max-height:100%; display:block;
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }
+  /* In normal print the frame flows (no definite height), so cap the map so the
+     header + map + legend fit one sheet instead of spilling to extra pages. The
+     full-bleed export keeps its own (definite-height) sizing. */
+  @media print{ html:not(.pdf-bleed) .dmap{ max-height:6in; } }
 
   /* circular complexity dial in the toolbar */
   .lvl{ display:flex; align-items:center; gap:7px; padding:0 2px; }
@@ -110,12 +116,32 @@
     background:oklch(0.935 0.012 84);
     box-shadow:inset 0 0 0 2px oklch(0.78 0.04 80 / .18);
   }
-  @media print{ .ck-box{ cursor:auto; } }
   .ck-letter{
     flex:none; min-width:34px; text-align:center; line-height:1;
     font-family:var(--font-display); font-weight:900; font-size:32px;
     color:transparent; background:linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
     -webkit-background-clip:text; background-clip:text;
+  }
+  @media print{
+    .ck-box{ cursor:auto; }
+    /* Print suppresses background graphics, and the gilded letter IS a gradient
+       background clipped to the text. Paint it as solid opaque text instead so
+       the letter actually prints. */
+    .ck-letter{
+      color:var(--gold-deep);
+      -webkit-text-fill-color:var(--gold-deep);
+      background:none;
+      -webkit-background-clip:border-box; background-clip:border-box;
+    }
+    /* Firefox's print engine collapses a `grid-template-columns:<fr>` grid to a
+       single column (an `fr`-in-paged-media bug), which doubles the Contents Key
+       height and overflows onto extra sheets. Lay the two columns out with a flex
+       row + fixed-width boxes instead — no `fr` units — so both engines print the
+       same two-up grid. Scoped to normal print; the bleed export is unaffected. */
+    html:not(.pdf-bleed) .ck-grid{
+      display:flex; flex-wrap:wrap; justify-content:center; gap:14px 0.32in;
+    }
+    html:not(.pdf-bleed) .ck-box{ width:3.05in; box-sizing:border-box; }
   }
   .ck-body{ flex:1; min-width:0; }
   .ck-type{ font-family:var(--font-struct); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold-deep); margin-bottom:5px; }
@@ -421,7 +447,7 @@
 <div id="contents-key"></div>
 
 <!-- ============================ II · EXPLORER'S MAP (PLAYERS) — always the last page ============================ -->
-<section class="page sheet" data-screen-label="The Explorer's Map">
+<section class="page sheet sheet-last" data-screen-label="The Explorer's Map">
   <div class="frame">
     <header class="sec-head map-head">
       <div class="numeral">Depth <span class="depth-val editable" id="depth-pl" contenteditable="true" spellcheck="false">V</span></div>

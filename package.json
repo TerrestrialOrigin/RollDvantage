@@ -8,7 +8,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run clean && vite --force",
     "build-web": "tsc -b && vite build",
     "build-android": "tsc -b && vite build &&npx cap sync android && npx cap open android",
     "build-ios": "tsc -b && vite build &&npx cap sync ios && npx cap open ios",
@@ -18,8 +18,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "validate": "bash ../scripts/validate-all.sh",
-    "clean": "rm -rf dist && rm -rf dist-electron"
+    "validate": "bash scripts/validate-all.sh",
+    "clean": "rm -rf dist && rm -rf dist-electron",
+    "print-check": "node scripts/print-check.mjs"
   },
   "build": {
     "appId": "com.terrestrialorigin.rolldvantage",
@@ -52,6 +53,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.3.1",
     "@eslint/js": "^9.21.0",
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^25.6.0",

@@ -1,0 +1,106 @@
+import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const FIXTURE = resolve(here, 'fixtures/seed-c0ffee.dungeon');
+
+/* ============================================================
+   E2E CHARACTERIZATION — real browser, full `npm run dev` stack, no mocks.
+   Locks the interactive editor behavior the refactor must preserve.
+   ============================================================ */
+
+// A tall viewport so the DM map (top) and the legend/toolbar (lower on the print
+// sheet) are both on-screen at once — required to drag a legend icon onto the map.
+test.use({ viewport: { width: 1400, height: 2400 } });
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.clear());
+  await page.goto('/');
+  await page.waitForSelector('#dm-map svg');
+});
+
+test('boots and renders both maps with walls and a compass', async ({ page }) => {
+  await expect(page.locator('#dm-map svg.dmap')).toBeVisible();
+  await expect(page.locator('#player-map svg.dmap')).toBeVisible();
+  await expect(page.locator('#dm-map .walls')).toHaveCount(1);
+  await expect(page.locator('#dm-map .compass')).toHaveCount(1);
+});
+
+test('loads a fixture dungeon deterministically', async ({ page }) => {
+  await page.setInputFiles('#file-load', FIXTURE);
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  await expect(page.locator('#dungeon-name-pl')).toHaveText('The Mansion');
+  // DM map shows all markers; player map only entrances.
+  const dmMarkers = await page.locator('#dm-map .mk').count();
+  const playerMarkers = await page.locator('#player-map .mk').count();
+  expect(dmMarkers).toBeGreaterThan(playerMarkers);
+  expect(playerMarkers).toBeGreaterThanOrEqual(1); // entrance always on player map
+});
+
+test('generates a "Map only" dungeon from the New menu', async ({ page }) => {
+  await page.click('#btn-new');
+  await page.getByRole('button', { name: 'Map only' }).click();
+  await expect(page.locator('#dm-map svg.dmap')).toBeVisible();
+  await expect(page.locator('#dm-map .walls')).toHaveCount(1);
+});
+
+test('drag-to-place a monster adds exactly one DM marker, undo removes it', async ({ page }) => {
+  await page.setInputFiles('#file-load', FIXTURE);
+  await page.waitForSelector('#dm-map .floor rect');
+
+  const before = await page.locator('#dm-map .mk').count();
+
+  // Compute the client-space center of the first floor cell (guaranteed placeable).
+  const point = await page.evaluate(() => {
+    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
+    const rect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svgBox = svg.getBoundingClientRect();
+    const vb = svg.viewBox.baseVal;
+    const scaleX = svgBox.width / vb.width;
+    const scaleY = svgBox.height / vb.height;
+    const cx = parseFloat(rect.getAttribute('x')!) + parseFloat(rect.getAttribute('width')!) / 2;
+    const cy = parseFloat(rect.getAttribute('y')!) + parseFloat(rect.getAttribute('height')!) / 2;
+    return { x: svgBox.left + cx * scaleX, y: svgBox.top + cy * scaleY };
+  });
+
+  const legend = page.locator('.legend-item', { has: page.locator('[data-icon="monster"]') }).first();
+  const legendBox = (await legend.boundingBox())!;
+  await page.mouse.move(legendBox.x + legendBox.width / 2, legendBox.y + legendBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(point.x, point.y, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before + 1);
+
+  await page.click('#btn-undo');
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before);
+});
+
+test('rejects an invalid file with an alert and leaves the dungeon unchanged (denial)', async ({ page }) => {
+  await page.setInputFiles('#file-load', FIXTURE);
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  const markersBefore = await page.locator('#dm-map .mk').count();
+
+  let alerted = '';
+  page.once('dialog', (dialog) => { alerted = dialog.message(); dialog.accept(); });
+
+  await page.setInputFiles('#file-load', {
+    name: 'bogus.dungeon',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"not":"a dungeon"}'),
+  });
+
+  await expect.poll(() => alerted).toContain('not a valid RollDvantage dungeon');
+  // unchanged
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore);
+});
+
+test('save triggers a .dungeon download', async ({ page }) => {
+  await page.setInputFiles('#file-load', FIXTURE);
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#btn-save');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.dungeon$/);
+});
