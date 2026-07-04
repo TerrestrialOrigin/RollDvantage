@@ -1,11 +1,67 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { configDefaults } from 'vitest/config'
+import { createHash } from 'node:crypto'
 
 const isElectron = process.env.BUILD_TARGET === 'electron';
+
+/* CSP hashes must cover the exact byte content of each inline script, so the
+   hashes are computed from the final HTML at build time — they can never drift
+   from the scripts they allow. */
+const inlineScriptHashes = (html: string): string[] => {
+  const inlineScriptPattern = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  const hashes: string[] = [];
+  for (const scriptMatch of html.matchAll(inlineScriptPattern)) {
+    const scriptContent = scriptMatch[1];
+    if (scriptContent.trim() === '') continue;
+    const digest = createHash('sha256').update(scriptContent).digest('base64');
+    hashes.push(`'sha256-${digest}'`);
+  }
+  return hashes;
+};
+
+const buildCspContent = (html: string): string => {
+  const scriptSources = ["'self'", ...inlineScriptHashes(html)].join(' ');
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSources}`,
+    /* 'unsafe-inline' styles are an accepted interim risk until the inline
+       <style> block is extracted (Change 8) — see the change's ThreatModel.md. */
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-src 'none'",
+  ].join('; ');
+};
+
+/* The Electron renderer loads from file://, where HTTP-header CSP is unreliable,
+   so the policy ships as a meta tag injected only into the Electron build. */
+const electronCspPlugin = (): Plugin => ({
+  name: 'electron-csp',
+  transformIndexHtml: {
+    order: 'post',
+    handler(html) {
+      return {
+        html,
+        tags: [
+          {
+            tag: 'meta',
+            attrs: { 'http-equiv': 'Content-Security-Policy', content: buildCspContent(html) },
+            injectTo: 'head-prepend',
+          },
+        ],
+      };
+    },
+  },
+});
 
 // https://vite.dev/config/
 export default defineConfig({
   base: isElectron ? './' : '/', // Use a relative base for Electron, absolute for Capacitor
+  plugins: isElectron ? [electronCspPlugin()] : [],
   build: {
     outDir: isElectron ? 'dist-electron' : 'dist',
   },

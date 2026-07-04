@@ -9,14 +9,17 @@
         "moduleResolution": "bundler",
         "noEmit": false,
         "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedSideEffectImports": true,
         "rootDir": "./src",
         "outDir": "dist-electron",
         "esModuleInterop": true,
         "types": ["node"]
     },
     "include": [
-        "src/electronMain.ts",
-        "src/preload.ts"
+        "src/electronMain.ts"
     ],
     "exclude": [
         "node_modules"

@@ -13,13 +13,23 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: /electron\.smoke\.spec\.ts/,
+    },
     /* Firefox is scoped to the print spec: print pagination differs between
        engines, so the print break behaviour must be proven on Firefox too. */
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
       testMatch: /printPageBreaks\.spec\.ts/,
+    },
+    /* Desktop-shell security smoke: launches the real Electron build (no vite
+       webServer involved) and proves the hardened posture end-to-end. */
+    {
+      name: 'electron',
+      testMatch: /electron\.smoke\.spec\.ts/,
     },
   ],
   webServer: {
