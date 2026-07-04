@@ -34,6 +34,9 @@
   --lh: 38px;                                   /* writing-line height */
   --page-w: 8.5in;
   --page-h: 11in;
+  /* decorative frame margin, proportional to the page (0.55in at Letter) so the
+     border inset scales with the selected page size */
+  --page-margin: calc(var(--page-w) * 0.0647);
 }
 
 *{ box-sizing:border-box; }
@@ -157,7 +160,7 @@ body{
 
 /* ====================================================== INTERIOR */
 .frame{
-  position:absolute; inset:0.55in;
+  position:absolute; inset:var(--page-margin);
   border:1px solid oklch(0.7 0.04 76 / .55);
   box-shadow:inset 0 0 0 3px oklch(0.78 0.04 80 / .25);
   padding:0.42in 0.5in;
@@ -313,6 +316,12 @@ body{
 @page{ size: var(--page-w) var(--page-h); margin:0; }
 @media print{
   body{ background:none; padding:0; margin:0; }
+
+  /* Keep the section header stacked (numeral over title) in print. A narrow
+     print viewport can otherwise trigger the ≤700px inline reflow — Firefox put
+     "Depth 1" and the dungeon name on one line. */
+  .sec-head .numeral{ display:block; margin-right:0; }
+  .sec-head h2{ display:block; margin:8px 0 0; }
 
   /* one section per sheet — see the break model note below */
   .page-wrap{ display:contents !important; }

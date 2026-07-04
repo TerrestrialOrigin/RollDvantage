@@ -19,7 +19,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "validate": "bash scripts/validate-all.sh",
-    "clean": "rm -rf dist && rm -rf dist-electron"
+    "clean": "rm -rf dist && rm -rf dist-electron",
+    "print-check": "node scripts/print-check.mjs"
   },
   "build": {
     "appId": "com.terrestrialorigin.rolldvantage",
