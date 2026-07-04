@@ -11,7 +11,14 @@ import { isBaseFloor } from '../geometry/topology';
 import { dmSvg, cellAtClient } from './mapSurface';
 import type { ControllerContext } from './types';
 
-export function attachNoteModalController(context: ControllerContext): void {
+export interface NoteModalHandles {
+  /** Open the annotation dialog for the feature at a grid cell (marker, room,
+      or corridor/secret-passage square) — the same resolution as double-click.
+      No-op when the cell holds nothing annotatable. */
+  openNoteAtCell: (cellX: number, cellY: number) => void;
+}
+
+export function attachNoteModalController(context: ControllerContext): NoteModalHandles {
   const { editor, getDungeon, modes } = context;
   const dmWrap = document.getElementById('dm-map');
 
@@ -56,6 +63,22 @@ export function attachNoteModalController(context: ControllerContext): void {
     return null;
   }
 
+  // annotate the feature at a grid cell — shared by double-click and the keyboard cursor
+  function openNoteAtCell(cellX: number, cellY: number): void {
+    const dungeon = getDungeon(); if (!dungeon) return;
+    const marker = annotatableMarkerAt(dungeon, cellX, cellY);
+    if (marker) { openNote(marker, 'marker'); return; }
+    const room = roomAt(dungeon, cellX, cellY);
+    if (room) { openNote(room.o, room.kind); return; }
+    // corridor / secret passage -> a loose note keyed to that square
+    if (isBaseFloor(dungeon, cellX, cellY) || (dungeon.secretFloor?.[cellY]?.[cellX] === 1)) {
+      dungeon.corridorNotes ??= [];
+      let existing: CorridorNote | null = null;
+      for (const note of dungeon.corridorNotes) { if (note.x === cellX && note.y === cellY) { existing = note; break; } }
+      openNote(existing ?? { x: cellX, y: cellY } as CorridorNote, 'corridor', dungeon.corridorNotes);
+    }
+  }
+
   // double-click a feature on the DM map to annotate it
   if (dmWrap) {
     dmWrap.addEventListener('dblclick', (event) => {
@@ -63,17 +86,7 @@ export function attachNoteModalController(context: ControllerContext): void {
       const dungeon = getDungeon();
       const svg = dmSvg(); if (!svg || !dungeon) return;
       const cell = cellAtClient(dungeon, event.clientX, event.clientY); if (!cell?.inside) return;
-      const marker = annotatableMarkerAt(dungeon, cell.x, cell.y);
-      if (marker) { openNote(marker, 'marker'); return; }
-      const room = roomAt(dungeon, cell.x, cell.y);
-      if (room) { openNote(room.o, room.kind); return; }
-      // corridor / secret passage -> a loose note keyed to that square
-      if (isBaseFloor(dungeon, cell.x, cell.y) || (dungeon.secretFloor?.[cell.y]?.[cell.x] === 1)) {
-        dungeon.corridorNotes ??= [];
-        let existing: CorridorNote | null = null;
-        for (const note of dungeon.corridorNotes) { if (note.x === cell.x && note.y === cell.y) { existing = note; break; } }
-        openNote(existing ?? { x: cell.x, y: cell.y } as CorridorNote, 'corridor', dungeon.corridorNotes);
-      }
+      openNoteAtCell(cell.x, cell.y);
     });
   }
 
@@ -103,4 +116,6 @@ export function attachNoteModalController(context: ControllerContext): void {
       else if (event.key === 'Escape') { event.preventDefault(); closeNote(); }
     });
   }
+
+  return { openNoteAtCell };
 }

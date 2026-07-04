@@ -17,6 +17,7 @@ import { attachToolbarController } from './controllers/toolbarController';
 import { attachDragPlaceController } from './controllers/dragPlaceController';
 import { attachContextMenuController } from './controllers/contextMenuController';
 import { attachStructureModeController } from './controllers/structureModeController';
+import { attachKeyboardEditController } from './controllers/keyboardEditController';
 import { attachNoteModalController } from './controllers/noteModalController';
 import type { ControllerContext, ModeState } from './controllers/types';
 
@@ -44,16 +45,19 @@ export function initDungeon(): void {
   watchContentsKeyBreakpoint(repaginateContentsKey);
   window.addEventListener('chronicle:pagesizechange', repaginateContentsKey);
 
-  const modes: ModeState = { current: null };
+  const modes: ModeState = { current: null, selectedMarkerType: null };
   const context: ControllerContext = { editor, getDungeon: () => store.getCurrent(), modes };
 
   // Order matches the original: toolbar/legend, then drag-to-place (its #dm-map
   // pointerdown must precede the structure handlers), then structure modes.
+  // The keyboard controller adds no #dm-map pointer handlers, so its position
+  // only needs to follow the controllers whose handles it consumes.
   const toolbar = attachToolbarController(editor, store);
   attachDragPlaceController(context);
   const contextMenu = attachContextMenuController(context);
-  attachStructureModeController({ ...context, openContextMenu: contextMenu.openContextMenu });
-  attachNoteModalController(context);
+  const structureModes = attachStructureModeController({ ...context, openContextMenu: contextMenu.openContextMenu });
+  const noteModal = attachNoteModalController(context);
+  attachKeyboardEditController({ ...context, openNoteAtCell: noteModal.openNoteAtCell, structureModes });
 
   // Keep the undo/redo buttons in sync after every history change.
   history.setChangeListener(toolbar.updateUndoRedoUI);

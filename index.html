@@ -78,7 +78,13 @@
     display:flex; flex-wrap:wrap; justify-content:center;
     gap:9px 22px; margin-top:14px;
   }
-  .legend-item{ display:flex; align-items:center; gap:9px; }
+  /* legend items are real <button>s (keyboard tool selection); reset the chrome
+     so visual + print output is identical to the old divs */
+  .legend-item{
+    display:flex; align-items:center; gap:9px;
+    background:none; border:0; padding:0; margin:0;
+    font:inherit; color:inherit; text-align:left; appearance:none;
+  }
   .legend-svg{ width:26px; height:26px; flex:none; }
   .legend-item .lbl{
     font-family:var(--font-struct); font-size:11px; font-weight:500;
@@ -89,6 +95,19 @@
   /* legend icons are draggable onto the map */
   .legend-item{ cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
   .legend-item:active{ cursor:grabbing; }
+  /* keyboard a11y: visible focus + selected-tool state */
+  .legend-item:focus-visible, #dm-map:focus-visible{
+    outline:2px solid var(--gold-deep); outline-offset:3px; border-radius:2px;
+  }
+  .legend-item[aria-pressed="true"]{
+    outline:2px solid var(--gold-deep); outline-offset:3px; border-radius:2px;
+    background:oklch(0.66 0.094 78 / .18);
+  }
+  /* the keyboard cell cursor on the DM map (solid, vs. the dashed edit previews) */
+  .kbd-cursor{
+    fill:oklch(0.66 0.094 78 / .18); stroke:var(--gold-deep); stroke-width:2.5;
+  }
+  @media print{ .legend-item[aria-pressed="true"]{ outline:none; background:none; } }
   .legend-hint{
     font-family:var(--font-body); font-style:italic; font-size:14px;
     color:var(--ink-soft); text-align:center; margin:12px 0 0;
@@ -426,14 +445,14 @@
       <div class="legend-block">
         <div class="sec-divider"><span class="ln"></span><span class="dot"></span><span class="ln rev"></span></div>
         <div class="legend">
-          <div class="legend-item"><span class="legend-svg" data-icon="entrance"></span><span class="lbl">Entrance</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="exit"></span><span class="lbl">Exit</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="monster"></span><span class="lbl">Monster</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="boss"></span><span class="lbl">Boss</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="trap"></span><span class="lbl">Trap</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="treasure"></span><span class="lbl">Treasure</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="secret"></span><span class="lbl">Secret Passage</span></div>
-          <div class="legend-item"><span class="legend-svg" data-icon="other"></span><span class="lbl">Other</span></div>
+          <button type="button" class="legend-item" data-marker-type="entrance" aria-pressed="false"><span class="legend-svg" data-icon="entrance"></span><span class="lbl">Entrance</span></button>
+          <button type="button" class="legend-item" data-marker-type="exit" aria-pressed="false"><span class="legend-svg" data-icon="exit"></span><span class="lbl">Exit</span></button>
+          <button type="button" class="legend-item" data-marker-type="monster" aria-pressed="false"><span class="legend-svg" data-icon="monster"></span><span class="lbl">Monster</span></button>
+          <button type="button" class="legend-item" data-marker-type="boss" aria-pressed="false"><span class="legend-svg" data-icon="boss"></span><span class="lbl">Boss</span></button>
+          <button type="button" class="legend-item" data-marker-type="trap" aria-pressed="false"><span class="legend-svg" data-icon="trap"></span><span class="lbl">Trap</span></button>
+          <button type="button" class="legend-item" data-marker-type="treasure" aria-pressed="false"><span class="legend-svg" data-icon="treasure"></span><span class="lbl">Treasure</span></button>
+          <button type="button" class="legend-item" data-marker-type="secret" aria-pressed="false"><span class="legend-svg" data-icon="secret"></span><span class="lbl">Secret Passage</span></button>
+          <button type="button" class="legend-item" data-marker-type="other" aria-pressed="false"><span class="legend-svg" data-icon="other"></span><span class="lbl">Other</span></button>
         </div>
         <p class="legend-hint">Drag an icon to place &middot; left-drag to add rooms/corridors &middot; right-drag to erase &middot; right-click for options &middot; double-click to key</p>
       </div>
@@ -500,7 +519,7 @@
 </div>
 
 <!-- ============================ TOOLBAR (screen only) ============================ -->
-<div class="mode-hint" id="mode-hint" hidden></div>
+<div class="mode-hint" id="mode-hint" role="status" aria-live="polite" hidden></div>
 <div class="toolbar" id="toolbar">
   <button class="tb-toggle" id="tb-toggle" aria-label="Open menu" aria-expanded="false">
     <span class="tb-ic"><span></span><span></span><span></span></span>

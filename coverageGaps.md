@@ -11,6 +11,13 @@ Mock-boundary reminder: E2E and integration tests MUST have no mocks on the path
 test. Drive the real app via the `npm run dev` stack (Playwright `webServer`), exactly
 as a human would.
 
+Update (2026-07-04, `accessible-map-editing`): keyboard map editing now has full E2E
+coverage (`e2e/keyboardEditing.spec.ts`, 12 keyboard-driven tests: cursor movement +
+clamping, tool selection, marker placement + denial on invalid cells, room/corridor/
+delete flows, Escape semantics, annotation, accessible map names, focus visibility),
+and `domRenderer.test.ts` unit-covers the SVG accessible-name contract incl. a
+hostile-name case.
+
 ## High priority (E2E — user-facing flows with no browser coverage)
 
 ### 1. Contents-Key pagination + responsive breakpoint
