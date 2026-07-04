@@ -1,7 +1,20 @@
 /* Responsive page scaling — wraps every .page and scales it to fit narrow
    viewports (the reflow below 700px is handled in CSS). Logic preserved verbatim. */
 
-const NATURAL_WIDTH = 8.5 * 96; // 816px — the page's natural width
+/**
+ * The page's natural (unscaled) width in CSS pixels, derived from the
+ * `--page-w` custom property so it tracks the selected page size and any unit
+ * (in/mm/cm/px). Measured via a hidden probe so the browser does the unit math.
+ * Falls back to Letter width (8.5in = 816px) if measurement is unavailable.
+ */
+function naturalWidth(): number {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;height:0;width:var(--page-w);';
+  document.body.appendChild(probe);
+  const width = probe.getBoundingClientRect().width;
+  probe.remove();
+  return width || 8.5 * 96;
+}
 
 /** Wrap each full page in a .page-wrap so it can be scaled independently. */
 export function wrapPages(): void {
@@ -27,7 +40,8 @@ export function fit(): void {
       return;
     }
     const available = wrap.clientWidth;
-    const scale = Math.min(1, available / NATURAL_WIDTH);
+    const natural = naturalWidth();
+    const scale = Math.min(1, available / natural);
     if (scale >= 1) {
       page.style.transform = '';
       page.style.marginLeft = '';
@@ -35,7 +49,7 @@ export function fit(): void {
     } else {
       page.style.transformOrigin = 'top left';
       page.style.transform = 'scale(' + scale + ')';
-      page.style.marginLeft = Math.max(0, (available - NATURAL_WIDTH * scale) / 2) + 'px';
+      page.style.marginLeft = Math.max(0, (available - natural * scale) / 2) + 'px';
       wrap.style.height = (page.offsetHeight * scale) + 'px';
     }
   });

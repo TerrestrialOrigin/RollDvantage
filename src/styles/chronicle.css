@@ -308,7 +308,9 @@ body{
    • width:auto (never wider than the paper) avoids Firefox's shrink-to-fit.
    This is scoped to `:not(.pdf-bleed)`; the full-bleed PDF export keeps the
    original absolute-frame model (see index.html). */
-@page{ margin:0; }
+/* Page size tracks the selected geometry (Chrome honours @page size incl. var();
+   Firefox ignores it and prints the dialog paper — print auto-fits either way). */
+@page{ size: var(--page-w) var(--page-h); margin:0; }
 @media print{
   body{ background:none; padding:0; margin:0; }
 
@@ -358,3 +360,38 @@ body{
     position:fixed !important; left:0; right:0; bottom:0.66in;
   }
 }
+
+/* ---------------- page-size control (screen chrome, top-right) ---------------- */
+.page-size-control{ position:fixed; top:18px; right:20px; z-index:60; font-family:var(--font-struct); }
+.ps-toggle{
+  display:flex; align-items:center; justify-content:center;
+  width:42px; height:42px; border-radius:50%; cursor:pointer;
+  background:oklch(0.18 0.014 64 / .92); color:oklch(0.86 0.03 82);
+  border:1px solid oklch(0.5 0.06 74 / .6); backdrop-filter:blur(8px);
+  box-shadow:0 10px 24px -10px rgba(0,0,0,.7);
+}
+.ps-toggle:hover{ color:var(--gold-bright); border-color:var(--gold); }
+.ps-popup{
+  position:absolute; top:52px; right:0; width:min(280px, calc(100vw - 40px));
+  background:oklch(0.18 0.014 64 / .96); backdrop-filter:blur(8px);
+  border:1px solid oklch(0.5 0.06 74 / .6); border-radius:14px;
+  padding:14px; box-shadow:0 18px 40px -14px rgba(0,0,0,.8);
+  color:oklch(0.86 0.03 82);
+}
+.ps-popup[hidden]{ display:none; }
+.ps-title{ font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
+.ps-presets{ display:flex; gap:6px; margin-bottom:12px; }
+.ps-presets button{
+  flex:1; padding:8px 0; font-family:var(--font-struct); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; cursor:pointer; border-radius:8px;
+  background:transparent; color:oklch(0.86 0.03 82); border:1px solid oklch(0.5 0.06 74 / .5);
+}
+.ps-presets button:hover{ color:var(--gold-bright); border-color:var(--gold); }
+.ps-presets button.active{ background:linear-gradient(180deg, var(--gold), var(--gold-deep)); color:oklch(0.16 0.014 64); font-weight:600; border-color:transparent; }
+.ps-custom label{ display:flex; align-items:center; gap:6px; font-size:11px; flex-wrap:wrap; color:oklch(0.8 0.03 82); }
+.ps-custom input[type=number]{ width:56px; padding:5px 6px; background:oklch(0.12 0.012 62); color:oklch(0.9 0.02 82); border:1px solid oklch(0.5 0.05 74 / .5); border-radius:6px; font-family:var(--font-body); }
+.ps-unit{ padding:5px; background:oklch(0.12 0.012 62); color:oklch(0.9 0.02 82); border:1px solid oklch(0.5 0.05 74 / .5); border-radius:6px; }
+.ps-apply{ padding:6px 12px; cursor:pointer; border-radius:6px; background:linear-gradient(180deg, var(--gold), var(--gold-deep)); color:oklch(0.16 0.014 64); font-weight:600; border:1px solid transparent; font-family:var(--font-struct); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+.ps-msg{ margin-top:8px; font-family:var(--font-body); font-style:italic; font-size:13px; color:oklch(0.78 0.09 45); min-height:1em; }
+@media print{ .page-size-control{ display:none !important; } }
+@media (max-width:760px){ .page-size-control{ top:12px; right:12px; } }
