@@ -1,1 +1,1 @@
-{"root":["./src/electronMain.ts","./src/preload.ts"],"version":"6.0.3"}
+{"root":["./src/electronMain.ts"],"version":"6.0.3"}

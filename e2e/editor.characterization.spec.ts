@@ -104,3 +104,13 @@ test('save triggers a .dungeon download', async ({ page }) => {
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.dungeon$/);
 });
+
+test('web build carries no Electron CSP meta tag', async ({ page }) => {
+  /* The CSP is Electron-only (injected when BUILD_TARGET=electron); the web
+     app must stay free of it. Catches the electron-csp vite plugin losing its
+     BUILD_TARGET guard, which would inject the CSP here too. */
+  const cspMetaCount = await page
+    .locator('meta[http-equiv="Content-Security-Policy"]')
+    .count();
+  expect(cspMetaCount).toBe(0);
+});
