@@ -35,7 +35,9 @@ function fromInches(inches: number, unit: Unit): number {
  * numbers ever reach the CSS variables).
  */
 export function validateDimension(value: unknown, unit: Unit): number | null {
-  const asNumber = typeof value === 'number' ? value : parseFloat(String(value));
+  // Number() (not parseFloat) so trailing garbage like "10in; }" is rejected
+  // outright rather than silently parsed to 10 — defense in depth for ThreatModel T1.
+  const asNumber = typeof value === 'number' ? value : Number(String(value).trim());
   if (!Number.isFinite(asNumber) || asNumber <= 0) return null;
   const clampedInches = Math.min(MAX_INCHES, Math.max(MIN_INCHES, toInches(asNumber, unit)));
   return Number(fromInches(clampedInches, unit).toFixed(3));
@@ -95,7 +97,7 @@ export interface PageSizeController {
 /** Resolve + apply the initial size immediately, and expose live changes. */
 export function setupPageSize(prefix: string, locale: string = navigator.language || 'en-US'): PageSizeController {
   let current = resolveInitial(prefix, locale);
-  const listeners: Array<(size: PageSize) => void> = [];
+  const listeners: ((size: PageSize) => void)[] = [];
   applyPageSize(current);
   return {
     get: () => current,

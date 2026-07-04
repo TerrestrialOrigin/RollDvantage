@@ -34,11 +34,15 @@ export function initDungeon(): void {
     renderContentsKey(annotations, dungeon);
   });
 
-  // Re-render the Contents Key when crossing the responsive breakpoint.
-  watchContentsKeyBreakpoint(() => {
+  // Re-paginate the Contents Key when the layout width changes: the responsive
+  // breakpoint, or a page-size change (the frame height it paginates against
+  // depends on --page-h).
+  function repaginateContentsKey(): void {
     const dungeon = store.getCurrent();
     if (dungeon) renderContentsKey(relabel(dungeon), dungeon);
-  });
+  }
+  watchContentsKeyBreakpoint(repaginateContentsKey);
+  window.addEventListener('chronicle:pagesizechange', repaginateContentsKey);
 
   const modes: ModeState = { current: null };
   const context: ControllerContext = { editor, getDungeon: () => store.getCurrent(), modes };

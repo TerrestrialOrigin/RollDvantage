@@ -62,9 +62,11 @@ export function setupPageSizeControl(controller: PageSizeController): void {
 
   function apply(size: PageSize): void {
     controller.set(size);
-    // let the on-screen scaling re-fit to the new page dimensions
+    // re-fit the on-screen scaling and re-paginate size-dependent content
     window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new CustomEvent('chronicle:pagesizechange'));
     reflectCurrent();
+    setOpen(false); // a successful choice closes the popup; invalid input keeps it open
   }
 
   let isOpen = false;

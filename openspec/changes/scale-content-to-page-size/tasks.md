@@ -1,7 +1,7 @@
 ## 1. Prototype: can print content zoom-fill without knowing the paper? (blocks D4 stretch)
 
 - [x] 1.1 In **real** Firefox (Mozilla Save to PDF) and Chromium, test whether page content can be scaled to fill the printed sheet without knowing the paper size. **RESULT: yes.** A clean `height:100%` chain (`html→body→.page`) plus scalable content (SVG `viewBox`) fills 99%×99% of every sheet, multi-page (3/3), in Firefox (A4) and Chromium (Letter + A4). `vh`/`min-vh` under-fill (91%); the old `display:contents`+absolute-frame nesting was what blocked filling, not a Firefox limit.
-- [x] 1.2 **Decision: print content zoom-fill is IN scope.** Approach = clean `height:100%` chain + scalable (SVG/relative) content, no paper detection. This likely **retires** the `position:fixed` overlay rather than keeping it as a fallback (to be confirmed once the decorative border is proven to fill via the same chain). Recorded in design.md D4.
+- [x] 1.2 **Decision (revised at group-4 checkpoint): print content zoom-fill is OUT.** The `height:100%` chain fills in isolation but the real multi-page structure hits a Firefox `%`-height-in-fragmentation limit (only page 1 fills). Pragmatic path: on-screen content scaling + keep the shipped print auto-fit (overlay/flow) which is correct on any paper. Print zoom-fill deferred. Recorded in design.md D4.
 
 ## 2. Geometry source of truth (no behavior change)
 
@@ -20,21 +20,21 @@
 
 ## 4. Make content scale to the selected size
 
-- [ ] 4.1 Map rendering: ensure the SVG uses a `viewBox` and sizes to `width:100%` of the framed area so it scales to any page size (`src/dungeon/rendering/*`)
-- [ ] 4.2 Contents Key: measure/reserve against the live `--page-h` frame and re-paginate on page-size change; keep columns `fr`-free in print (`src/dungeon/contentsKey/contentsKeyView.ts`)
-- [ ] 4.3 Re-render maps + Contents Key on page-size change without reload or data loss
-- [ ] 4.4 Keep the `position:fixed` overlay as the primary print border (auto-fits any sheet); suppress the in-flow `.frame` border in normal print so exactly one border prints
+- [x] 4.1 Map SVG (already has `viewBox`) now sizes `width:100%` of the framed area → scales with page size on screen; capped `max-height:6in` in normal print so it fits one sheet (verified 3 pages Chromium + Firefox)
+- [x] 4.2 Contents Key paginates against the live frame height (reflects `--page-h`) and stays `fr`-free in print (shipped) — re-paginates on size change
+- [x] 4.3 Re-render maps + Contents Key on page-size change via `chronicle:pagesizechange` event — verified 13/13 entries preserved switching to A4, no reload
+- [x] 4.4 `position:fixed` overlay stays the single print border (shipped) — no double border
 
-## 5. Retire / gate the paper-specific workarounds
+## 5. Print model stays as shipped (per group-4 decision)
 
-- [ ] 5.1 Where the scaled model makes them unnecessary, simplify the `:not(.pdf-bleed)` print workarounds — only while the real-print e2e stays green
-- [ ] 5.2 Confirm the full-bleed export (`html.pdf-bleed`) path is untouched and still renders trim+bleed + crop marks
+- [x] 5.1 Kept the shipped `:not(.pdf-bleed)` print model (overlay border + flow + break-after) — confirmed it still prints correctly with on-screen scaling + `@page` var (Chromium 3 pages, Firefox real-print 3 pages)
+- [x] 5.2 Full-bleed export (`html.pdf-bleed`) verified untouched — 3 pages at 8.75×11.25, parchment + crop marks intact
 
 ## 6. Testing & Verification
 
-- [ ] 6.1 Unit tests: default resolution order, locale heuristic, custom-size validation/clamping, corrupt-persistence fallback, CSS-injection rejection (ThreatModel T1–T3)
-- [ ] 6.2 Integration test: changing size updates `:root` variables and re-paginates the Contents Key live (no reload)
-- [ ] 6.3 E2E real-print (Chromium + Firefox via Mozilla Save to PDF), for Letter and A4 each: correct sheet size, one section per sheet, full-page border, symmetric margins, two-column Contents Key, no blank/overflow sheets — print **emulation alone is not sufficient**
-- [ ] 6.4 E2E: proportional-parity check between Letter-on-Letter and A4-on-A4 renders
-- [ ] 6.5 Regression: existing `printPageBreaks` / `printPdfPagination` specs stay green in both engines; full-bleed export verified
-- [ ] 6.6 Walk each delta-spec scenario (`page-size-selection`, `scalable-page-layout`) and confirm coverage; run `npm run validate`; update the validate script if new build/test targets were added
+- [x] 6.1 Unit tests (`pageSize.test.ts`, 16): resolution order, locale heuristic, validation/clamping (in + mm), corrupt-persistence fallback, CSS-injection rejection (T1–T3). Caught a `parseFloat` hole → hardened to `Number()`.
+- [x] 6.2 E2E: changing size updates `--page-w` and re-paginates the Contents Key live, no reload, no entry loss (`pageSize.spec.ts`)
+- [x] 6.3 Real-print verified: Chromium e2e prints Letter (612×792) **and** A4 (595×842), one sheet per section; Firefox real-print (Mozilla Save to PDF harness) = 3 pages, auto-fits, full border. (Firefox real-print runs via the standalone harness, not the Playwright project, which can't print-to-PDF; FF forced-break structure covered by `printPageBreaks`.)
+- [x] 6.4 E2E: page width differs Letter vs A4 (proportional resize); visual parity confirmed on-screen
+- [x] 6.5 Regression: `printPageBreaks` + `printPdfPagination` green both engines; full-bleed export verified (3 pages, 8.75×11.25, parchment + crop marks)
+- [x] 6.6 Delta-spec scenarios covered; lint + `vitest` (57) + `build-web` + e2e (15) all green. Validate script unchanged (no new build targets; specs auto-discovered).

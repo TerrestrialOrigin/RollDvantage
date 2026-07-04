@@ -25,10 +25,16 @@
   }
 
   .map-wrap{ text-align:center; flex:1; display:flex; flex-direction:column; align-items:center; }
+  /* Maps scale to fill the framed width so content resizes with the page size. */
+  #dm-map, #player-map{ width:100%; }
   .dmap{
-    width:510px; height:auto; display:block;
+    width:100%; height:auto; max-height:100%; display:block;
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }
+  /* In normal print the frame flows (no definite height), so cap the map so the
+     header + map + legend fit one sheet instead of spilling to extra pages. The
+     full-bleed export keeps its own (definite-height) sizing. */
+  @media print{ html:not(.pdf-bleed) .dmap{ max-height:6in; } }
 
   /* circular complexity dial in the toolbar */
   .lvl{ display:flex; align-items:center; gap:7px; padding:0 2px; }
