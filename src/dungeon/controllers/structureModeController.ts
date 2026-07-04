@@ -8,45 +8,56 @@
 import { corridorCells } from '../geometry/grid';
 import { isBaseFloor } from '../geometry/topology';
 import { markerAtCell } from '../editing/featureQueries';
-import { dmSvg, cellAtClient, clampedCellAtClient, fxGroup, clearPreview } from './mapSurface';
+import { dmSvg, cellAtClient, clampedCellAtClient, clearPreview } from './mapSurface';
+import { drawRoomPreview as paintRoomPreview, drawCorridorPreview as paintCorridorPreview, drawDeletePreview as paintDeletePreview } from './previews';
 import type { ControllerContext, EditMode } from './types';
 
 export interface StructureModeDeps extends ControllerContext {
   openContextMenu: (gx: number, gy: number, clientX: number, clientY: number) => void;
 }
 
-export function attachStructureModeController(deps: StructureModeDeps): void {
+export interface StructureModeHandles {
+  /** Set (or clear, with null) the structure-editing mode — same toggle the mode buttons use. */
+  setMode: (next: EditMode) => void;
+  /** Restore the standard mode-hint text/visibility for the current mode. */
+  updateModeHint: () => void;
+}
+
+/** Clear any selected legend marker tool: shared state + button pressed styling. */
+export function clearMarkerSelection(modes: ControllerContext['modes']): void {
+  modes.selectedMarkerType = null;
+  document.querySelectorAll('.legend-item[data-marker-type]').forEach((button) => {
+    button.setAttribute('aria-pressed', 'false');
+  });
+}
+
+export function attachStructureModeController(deps: StructureModeDeps): StructureModeHandles {
   const { editor, getDungeon, modes, openContextMenu } = deps;
   const dmWrap = document.getElementById('dm-map');
 
-  // ---- previews ----
+  // ---- previews (shared painters; the keyboard controller draws the same ones) ----
   function drawRoomPreview(x0: number, y0: number, x1: number, y1: number): void {
-    const group = fxGroup(); if (!group) return; const cell = getDungeon()!.grid.cell;
-    const ax = Math.min(x0, x1), ay = Math.min(y0, y1), bx = Math.max(x0, x1), by = Math.max(y0, y1);
-    group.innerHTML = '<rect x="' + (ax * cell) + '" y="' + (ay * cell) + '" width="' + ((bx - ax + 1) * cell) + '" height="' + ((by - ay + 1) * cell) + '" fill="oklch(0.66 0.094 78 / .22)" stroke="oklch(0.52 0.084 70)" stroke-width="2" stroke-dasharray="6 4"/>';
+    paintRoomPreview(getDungeon()!.grid.cell, x0, y0, x1, y1);
   }
   function drawCorridorPreview(cells: [number, number][]): void {
-    const group = fxGroup(); if (!group) return; const cell = getDungeon()!.grid.cell; let markup = '';
-    cells.forEach((point) => { markup += '<rect x="' + (point[0] * cell) + '" y="' + (point[1] * cell) + '" width="' + cell + '" height="' + cell + '" fill="oklch(0.66 0.094 78 / .3)" stroke="oklch(0.52 0.084 70)" stroke-width="1"/>'; });
-    group.innerHTML = markup;
+    paintCorridorPreview(getDungeon()!.grid.cell, cells);
   }
   function drawDeletePreview(x0: number, y0: number, x1: number, y1: number): void {
-    const group = fxGroup(); if (!group) return; const cell = getDungeon()!.grid.cell;
-    const ax = Math.min(x0, x1), ay = Math.min(y0, y1), bx = Math.max(x0, x1), by = Math.max(y0, y1);
-    group.innerHTML = '<rect x="' + (ax * cell) + '" y="' + (ay * cell) + '" width="' + ((bx - ax + 1) * cell) + '" height="' + ((by - ay + 1) * cell) + '" fill="oklch(0.55 0.16 30 / .25)" stroke="oklch(0.5 0.15 32)" stroke-width="2" stroke-dasharray="6 4"/>';
+    paintDeletePreview(getDungeon()!.grid.cell, x0, y0, x1, y1);
   }
 
   // ---- mode switching + hint ----
   let corridorStart: { x: number; y: number } | null = null;
   function updateModeHint(): void {
     const element = document.getElementById('mode-hint'); if (!element) return;
-    if (modes.current === 'room') { element.textContent = 'Add Room: drag a rectangle across the squares. Esc to finish.'; element.hidden = false; }
-    else if (modes.current === 'corridor') { element.textContent = 'Add Corridor: click a square to start, click again to set the end. Esc to finish.'; element.hidden = false; }
-    else if (modes.current === 'delete') { element.textContent = 'Delete: click a square, or drag a rectangle, to erase. Esc to finish.'; element.hidden = false; }
+    if (modes.current === 'room') { element.textContent = 'Add Room: drag a rectangle across the squares, or press Enter at the keyboard cursor to anchor and again to commit. Esc to finish.'; element.hidden = false; }
+    else if (modes.current === 'corridor') { element.textContent = 'Add Corridor: click (or press Enter at the keyboard cursor on) a square to start, then again to set the end. Esc to finish.'; element.hidden = false; }
+    else if (modes.current === 'delete') { element.textContent = 'Delete: click a square, drag a rectangle, or press Enter at the keyboard cursor to anchor and again to erase. Esc to finish.'; element.hidden = false; }
     else { element.hidden = true; }
   }
   function setMode(next: EditMode): void {
     modes.current = (modes.current === next) ? null : next;
+    if (modes.current) clearMarkerSelection(modes);   // a structure mode and a legend tool are mutually exclusive
     corridorStart = null; roomDraw = null; delDraw = null; clearPreview();
     const room = document.getElementById('btn-room'), corridor = document.getElementById('btn-corridor'), del = document.getElementById('btn-delete');
     if (room) room.classList.toggle('active', modes.current === 'room');
@@ -61,7 +72,8 @@ export function attachStructureModeController(deps: StructureModeDeps): void {
   const btnDelete = document.getElementById('btn-delete'); if (btnDelete) btnDelete.addEventListener('click', () => setMode('delete'));
   window.addEventListener('keydown', (event) => { if (event.key === 'Escape') { if (modes.current) setMode(null); } });
 
-  if (!dmWrap) return;
+  const handles: StructureModeHandles = { setMode, updateModeHint };
+  if (!dmWrap) return handles;
 
   // suppress the browser's native right-click menu over the map; reset corridor in-progress
   dmWrap.addEventListener('contextmenu', (event) => {
@@ -186,4 +198,6 @@ export function attachStructureModeController(deps: StructureModeDeps): void {
     rdelDraw = { sx: cell.x, sy: cell.y, cx: cell.x, cy: cell.y, armed: false, dsx: pointer.clientX, dsy: pointer.clientY };
     window.addEventListener('pointermove', rdelMove); window.addEventListener('pointerup', rdelUp);
   });
+
+  return handles;
 }

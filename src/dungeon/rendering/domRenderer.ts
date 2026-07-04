@@ -24,10 +24,22 @@ export function updateFootNames(name: string | undefined): void {
   document.querySelectorAll('.foot-name').forEach((element) => { (element as HTMLElement).textContent = value; });
 }
 
+/** Name a freshly injected map SVG for assistive tech. Attribute APIs only, so a
+    user-typed dungeon name can never become markup; buildSVG stays untouched
+    (its output is locked byte-for-byte by the golden snapshot). */
+function labelMapSvg(wrapId: string, accessibleName: string): void {
+  const svg = document.querySelector('#' + wrapId + ' svg');
+  if (!svg) return;
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', accessibleName);
+}
+
 /** Render both maps and the header/tally text from a dungeon object. */
 export function renderDungeon(dungeon: Dungeon): void {
   setHTML('dm-map', buildSVG(dungeon, { secret: true, dmMarkers: true }));
   setHTML('player-map', buildSVG(dungeon, { secret: false, dmMarkers: false }));
+  labelMapSvg('dm-map', dungeon.name + " — Game Master's map: " + dungeon.tally.rooms + ' rooms, depth ' + dungeon.depth);
+  labelMapSvg('player-map', dungeon.name + ' — player map');
 
   setText('dungeon-name-dm', dungeon.name);
   setText('dungeon-name-pl', dungeon.name);
