@@ -37,4 +37,8 @@ describe('contents-key labels', () => {
     expect(esc('<img src=x onerror=alert(1)>')).toBe('&lt;img src=x onerror=alert(1)&gt;');
     expect(esc('a & b')).toBe('a &amp; b');
   });
+
+  it('escapes quotes for attribute-context safety', () => {
+    expect(esc('"double" and \'single\'')).toBe('&quot;double&quot; and &#39;single&#39;');
+  });
 });

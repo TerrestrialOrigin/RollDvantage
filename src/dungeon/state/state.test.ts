@@ -95,3 +95,84 @@ describe('DungeonStore refresh/restore + history', () => {
     expect(calls).toBe(1); // unsubscribed
   });
 });
+
+describe('DungeonStore snapshot contract (useSyncExternalStore)', () => {
+  it('getState returns the identical reference between mutations', () => {
+    const store = new DungeonStore(new History(), memStore());
+    expect(store.getState()).toBe(store.getState());
+    store.loadFresh(dungeon('a'));
+    const snapshot = store.getState();
+    expect(store.getState()).toBe(snapshot);
+  });
+
+  it('every mutator produces a fresh snapshot reflecting the new state', () => {
+    const store = new DungeonStore(new History(), memStore());
+    const initial = store.getState();
+
+    store.loadFresh(dungeon('a'));
+    const afterLoad = store.getState();
+    expect(afterLoad).not.toBe(initial);
+    expect(afterLoad.dungeon!.name).toBe('a');
+    expect(afterLoad.dirty).toBe(false);
+
+    store.getCurrent()!.name = 'edited';
+    store.refresh();
+    const afterRefresh = store.getState();
+    expect(afterRefresh).not.toBe(afterLoad);
+    expect(afterRefresh.dirty).toBe(true);
+
+    store.setDirty(false);
+    const afterSetDirty = store.getState();
+    expect(afterSetDirty).not.toBe(afterRefresh);
+    expect(afterSetDirty.dirty).toBe(false);
+
+    store.setLevel(5);
+    const afterSetLevel = store.getState();
+    expect(afterSetLevel).not.toBe(afterSetDirty);
+    expect(afterSetLevel.level).toBe(5);
+
+    store.restore(dungeon('restored'));
+    const afterRestore = store.getState();
+    expect(afterRestore).not.toBe(afterSetLevel);
+    expect(afterRestore.dungeon!.name).toBe('restored');
+    expect(afterRestore.dirty).toBe(true);
+  });
+
+  it('subscribers reading synchronously during refresh see settled dirty and undo availability', () => {
+    const history = new History();
+    const store = new DungeonStore(history, memStore());
+    store.loadFresh(dungeon('base'));
+
+    let seen: { dirty: boolean; canUndo: boolean } | null = null;
+    store.subscribe(() => { seen = { dirty: store.getState().dirty, canUndo: history.canUndo() }; });
+    store.getCurrent()!.name = 'edited';
+    store.refresh();
+    expect(seen).toEqual({ dirty: true, canUndo: true });
+  });
+
+  it('subscribers reading synchronously during loadFresh see the settled clean state', () => {
+    const store = new DungeonStore(new History(), memStore());
+    let seenDirty: boolean | null = null;
+    store.subscribe(() => { seenDirty = store.getState().dirty; });
+    store.loadFresh(dungeon('fresh'));
+    expect(seenDirty).toBe(false);
+  });
+});
+
+describe('History snapshot isolation (M9)', () => {
+  it('mutating an undo-returned dungeon does not corrupt the stack', () => {
+    const history = new History();
+    history.record(dungeon('a'));
+    history.record(dungeon('b'));
+
+    const undone = history.undo()!;
+    expect(undone.name).toBe('a');
+    undone.name = 'corrupted';
+    undone.markers.push({ type: 'monster', x: 0, y: 0 });
+
+    expect(history.redo()!.name).toBe('b');
+    const backAgain = history.undo()!;
+    expect(backAgain.name).toBe('a');
+    expect(backAgain.markers).toHaveLength(0);
+  });
+});

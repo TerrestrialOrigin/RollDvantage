@@ -36,5 +36,5 @@ export function commitDelete(dungeon: Dungeon, x0: number, y0: number, x1: numbe
   if (dungeon.corridorNotes) dungeon.corridorNotes = dungeon.corridorNotes.filter((note) => !deleted[note.y * gridWidth + note.x]);
   dungeon.rooms = (dungeon.rooms || []).filter((room) => gridHasRoomCell(room, dungeon.floor));
   if (dungeon.secretFloor) dungeon.secretRooms = (dungeon.secretRooms ?? []).filter((room) => gridHasRoomCell(room, dungeon.secretFloor!));
-  if (dungeon.secretPaths) dungeon.secretPaths = dungeon.secretPaths.filter((path) => { if (path.x1 == null) return true; return cellAlive(dungeon, path.x1, path.y1!) && cellAlive(dungeon, path.x2!, path.y2!); });
+  if (dungeon.secretPaths) dungeon.secretPaths = dungeon.secretPaths.filter((path) => cellAlive(dungeon, path.x1, path.y1) && cellAlive(dungeon, path.x2, path.y2));
 }

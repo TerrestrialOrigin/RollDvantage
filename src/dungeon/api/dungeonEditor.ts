@@ -14,7 +14,7 @@ import { edgeDir } from '../geometry/grid';
 import { commitRoom, commitCorridor, commitDelete } from '../editing/structureOps';
 import { convertSecretAt, unconvertSecret } from '../editing/secretOps';
 import { applyNote, removeNote } from '../editing/noteOps';
-import { serializeDungeon, parseDungeonText } from '../persistence/dungeonFile';
+import { serializeDungeon, parseDungeonText, isValidDungeon, migrateDungeon } from '../persistence/dungeonFile';
 import type { DungeonStore, DungeonState } from '../state/dungeonStore';
 import type { History } from '../state/history';
 
@@ -66,8 +66,9 @@ export function createDungeonEditor(store: DungeonStore, history: History, seedS
 
   return {
     generate(mode: GenerationMode = 'full', seed: number = seedSource()): void {
-      const dungeon = generateDungeon(seed, store.getLevel(), mode) as unknown as Dungeon;
-      store.loadFresh(dungeon);
+      const generated: unknown = generateDungeon(seed, store.getLevel(), mode);
+      if (!isValidDungeon(generated)) throw new Error('generateDungeon produced a structurally invalid dungeon (seed ' + seed + ', mode ' + mode + ')');
+      store.loadFresh(migrateDungeon(generated));
     },
 
     setLevel(level: number): void {

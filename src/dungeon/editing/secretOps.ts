@@ -50,23 +50,23 @@ export function unconvertSecret(dungeon: Dungeon, x: number, y: number): void {
   const secretFloor = dungeon.secretFloor;
   const secretIndex = secretRoomIndexAt(dungeon, x, y), gridWidth = dungeon.grid.gw;
   if (secretIndex >= 0) {
-    const room = dungeon.secretRooms![secretIndex];
+    const secretRooms = dungeon.secretRooms ?? [];
+    const room = secretRooms[secretIndex];
+    if (!room) return;
     for (let yy = room.y; yy < room.y + room.h; yy++) for (let xx = room.x; xx < room.x + room.w; xx++) {
       if (secretFloor[yy][xx] === 1) { secretFloor[yy][xx] = 0; dungeon.floor[yy][xx] = 1; }
     }
-    dungeon.secretRooms!.splice(secretIndex, 1);
+    secretRooms.splice(secretIndex, 1);
     dungeon.rooms.push(room);
     const inRoom = (mx: number, my: number) => mx >= room.x && mx < room.x + room.w && my >= room.y && my < room.y + room.h;
     dungeon.markers = dungeon.markers.filter((marker) => !(marker.type === 'secret' && inRoom(marker.x, marker.y)));
-    dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) => { if (path.x1 == null) return true; return !(inRoom(path.x1, path.y1!) || inRoom(path.x2!, path.y2!)); });
+    dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) => !(inRoom(path.x1, path.y1) || inRoom(path.x2, path.y2)));
     return;
   }
   const run = straightRunF(x, y, (cx, cy) => isSecretCorridorCell(dungeon, cx, cy)).cells;
   const cleared: Record<number, number> = {};
   run.forEach((cell) => { secretFloor[cell[1]][cell[0]] = 0; dungeon.floor[cell[1]][cell[0]] = 1; cleared[cell[1] * gridWidth + cell[0]] = 1; });
   dungeon.markers = dungeon.markers.filter((marker) => !(marker.type === 'secret' && cleared[marker.y * gridWidth + marker.x]));
-  dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) => {
-    if (path.x1 == null) return true;
-    return (secretFloor[path.y1!]?.[path.x1] === 1) || (secretFloor[path.y2!]?.[path.x2!] === 1);
-  });
+  dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) =>
+    (secretFloor[path.y1]?.[path.x1] === 1) || (secretFloor[path.y2]?.[path.x2] === 1));
 }

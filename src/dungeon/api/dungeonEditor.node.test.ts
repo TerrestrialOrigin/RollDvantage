@@ -63,4 +63,38 @@ describe('DungeonEditor runs headless (no DOM)', () => {
     expect(store.getLevel()).toBe(5);
     expect(store.isDirty()).toBe(false);
   });
+
+  it('loads a legacy-schema file through the real path, migrated, and secret ops work on it', () => {
+    // The documented legacy shape: L-schema secretPaths (ax/ay/bx/by/horizFirst).
+    const gridWidth = 6, gridHeight = 5;
+    const floor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
+    floor[1][1] = floor[1][2] = floor[2][1] = floor[2][2] = 1;
+    const secretFloor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
+    secretFloor[3][1] = secretFloor[3][2] = secretFloor[3][3] = 1;
+    const legacyJson = JSON.stringify({
+      seed: 123, name: 'Old Keep', depth: 'Depth 2', level: 2,
+      grid: { gw: gridWidth, gh: gridHeight, cell: 24 },
+      floor, rooms: [{ x: 1, y: 1, w: 2, h: 2, id: 1 }],
+      markers: [{ type: 'secret', x: 2, y: 3, placed: true }],
+      secretFloor,
+      secretPaths: [{ ax: 1, ay: 3, bx: 3, by: 3, horizFirst: true }],
+      tally: { rooms: 1, foes: 0, traps: 0, loot: 0, secret: 1 },
+    });
+
+    const { editor } = makeEditor();
+    editor.loadFromJson(parseDungeonText(legacyJson));
+    const loaded = editor.getState().dungeon!;
+    expect(loaded.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]); // migrated
+    expect(loaded.version).toBe(1);
+
+    // A consumer of the migrated shape works: unmake the secret passage.
+    editor.unmakeSecret(2, 3);
+    const after = editor.getState().dungeon!;
+    expect(after.secretPaths).toHaveLength(0);
+    expect(after.floor[3][2]).toBe(1); // passage back on the visible floor
+  });
+
+  it('rejects structurally hostile JSON at the boundary', () => {
+    expect(() => parseDungeonText('{"grid":{"gw":2,"gh":1,"cell":24},"floor":"x","markers":{},"seed":1}')).toThrow();
+  });
 });

@@ -45,7 +45,9 @@ export function featureAt(dungeon: Dungeon, x: number, y: number): Feature | nul
   const markerIndex = markerAtCell(dungeon, x, y);
   if (markerIndex >= 0 && dungeon.markers[markerIndex].type !== 'secret') return { kind: 'marker', idx: markerIndex, marker: dungeon.markers[markerIndex] };
   const roomIndex = roomIndexAt(dungeon, x, y); if (roomIndex >= 0) return { kind: 'room', room: dungeon.rooms[roomIndex] };
-  const secretIndex = secretRoomIndexAt(dungeon, x, y); if (secretIndex >= 0) return { kind: 'secret-room', room: dungeon.secretRooms![secretIndex] };
+  const secretIndex = secretRoomIndexAt(dungeon, x, y);
+  const secretRoom = secretIndex >= 0 ? (dungeon.secretRooms ?? [])[secretIndex] : undefined;
+  if (secretRoom) return { kind: 'secret-room', room: secretRoom };
   if (isBaseFloor(dungeon, x, y)) return { kind: 'corridor' };
   if (dungeon.secretFloor?.[y]?.[x] === 1) return { kind: 'secret-corridor' };
   return null;
@@ -53,7 +55,11 @@ export function featureAt(dungeon: Dungeon, x: number, y: number): Feature | nul
 
 /** The bounding box of a feature (room rect, or the straight run through a corridor cell). */
 export function featureBBox(dungeon: Dungeon, feature: Feature, gx: number, gy: number): BBox {
-  if (feature.kind === 'room' || feature.kind === 'secret-room') { const room = feature.room!; return { ax: room.x, ay: room.y, bx: room.x + room.w - 1, by: room.y + room.h - 1 }; }
+  if (feature.kind === 'room' || feature.kind === 'secret-room') {
+    const room = feature.room;
+    if (!room) return { ax: gx, ay: gy, bx: gx, by: gy }; // defensive: room features always carry their room
+    return { ax: room.x, ay: room.y, bx: room.x + room.w - 1, by: room.y + room.h - 1 };
+  }
   const run = (feature.kind === 'corridor') ? straightRun(dungeon, gx, gy).cells : straightRunF(gx, gy, (x, y) => isSecretCorridorCell(dungeon, x, y)).cells;
   let ax = 1e9, ay = 1e9, bx = -1, by = -1;
   run.forEach((cell) => { if (cell[0] < ax) ax = cell[0]; if (cell[0] > bx) bx = cell[0]; if (cell[1] < ay) ay = cell[1]; if (cell[1] > by) by = cell[1]; });

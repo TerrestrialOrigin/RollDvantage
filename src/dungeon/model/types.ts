@@ -57,17 +57,22 @@ export interface Room extends Annotatable {
   id?: number;
 }
 
-/** Current-schema secret passage (centerline). Legacy files use the ax/ay form. */
+/** Secret passage centerline (current schema). Load-time migration guarantees
+    this shape everywhere past the persistence boundary. */
 export interface SecretPath {
-  x1?: number;
-  y1?: number;
-  x2?: number;
-  y2?: number;
-  // legacy L-schema
-  ax?: number;
-  ay?: number;
-  bx?: number;
-  by?: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** Legacy L-schema secret passage, accepted only at the load boundary and
+    migrated to straight SecretPath segments by `migrateDungeon`. */
+export interface LegacySecretPath {
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
   horizFirst?: boolean;
 }
 
