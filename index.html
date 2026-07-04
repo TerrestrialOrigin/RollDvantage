@@ -127,6 +127,15 @@
       background:none;
       -webkit-background-clip:border-box; background-clip:border-box;
     }
+    /* Firefox's print engine collapses a `grid-template-columns:<fr>` grid to a
+       single column (an `fr`-in-paged-media bug), which doubles the Contents Key
+       height and overflows onto extra sheets. Lay the two columns out with a flex
+       row + fixed-width boxes instead — no `fr` units — so both engines print the
+       same two-up grid. Scoped to normal print; the bleed export is unaffected. */
+    html:not(.pdf-bleed) .ck-grid{
+      display:flex; flex-wrap:wrap; justify-content:center; gap:14px 0.32in;
+    }
+    html:not(.pdf-bleed) .ck-box{ width:3.05in; box-sizing:border-box; }
   }
   .ck-body{ flex:1; min-width:0; }
   .ck-type{ font-family:var(--font-struct); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold-deep); margin-bottom:5px; }
@@ -432,7 +441,7 @@
 <div id="contents-key"></div>
 
 <!-- ============================ II · EXPLORER'S MAP (PLAYERS) — always the last page ============================ -->
-<section class="page sheet" data-screen-label="The Explorer's Map">
+<section class="page sheet sheet-last" data-screen-label="The Explorer's Map">
   <div class="frame">
     <header class="sec-head map-head">
       <div class="numeral">Depth <span class="depth-val editable" id="depth-pl" contenteditable="true" spellcheck="false">V</span></div>

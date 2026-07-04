@@ -14,6 +14,13 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    /* Firefox is scoped to the print spec: print pagination differs between
+       engines, so the print break behaviour must be proven on Firefox too. */
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /printPageBreaks\.spec\.ts/,
+    },
   ],
   webServer: {
     command: 'npm run dev',
