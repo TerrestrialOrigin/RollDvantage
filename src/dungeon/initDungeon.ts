@@ -64,7 +64,7 @@ export function initDungeon(options: InitDungeonOptions = {}): void {
   const contextMenu = attachContextMenuController(context);
   const structureModes = attachStructureModeController({ ...context, openContextMenu: contextMenu.openContextMenu });
   const noteModal = attachNoteModalController(context);
-  attachKeyboardEditController({ ...context, openNoteAtCell: noteModal.openNoteAtCell, structureModes });
+  attachKeyboardEditController({ ...context, openNoteAtCell: noteModal.openNoteAtCell, structureModes, openContextMenu: contextMenu.openContextMenu });
 
   // Keep the undo/redo buttons in sync after every history change.
   history.setChangeListener(toolbar.updateUndoRedoUI);

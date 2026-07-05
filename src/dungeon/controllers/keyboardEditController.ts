@@ -21,6 +21,10 @@ import type { ControllerContext, EditMode } from './types';
 export interface KeyboardEditDeps extends ControllerContext {
   openNoteAtCell: (cellX: number, cellY: number) => void;
   structureModes: StructureModeHandles;
+  /** Opens the shared cell context menu (same handle the pointer path uses), so a
+      keyboard user can reach the pointer-only Delete-one-marker and Make-Not-Secret
+      actions at the cursor. No new menu code — this is the existing accessible menu. */
+  openContextMenu: (gridX: number, gridY: number, clientX: number, clientY: number) => void;
 }
 
 interface CellPosition { x: number; y: number; }
@@ -36,7 +40,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const RETYPE_ORDER: MarkerType[] = ['monster', 'boss', 'treasure', 'trap', 'entrance', 'exit', 'other'];
 
 export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
-  const { editor, getDungeon, modes, openNoteAtCell, structureModes } = deps;
+  const { editor, getDungeon, modes, openNoteAtCell, structureModes, openContextMenu } = deps;
   const dmWrap = document.getElementById('dm-map');
   if (!dmWrap) return;
 
@@ -44,10 +48,15 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
   dmWrap.setAttribute('role', 'application');
   dmWrap.setAttribute('aria-label',
     'Dungeon map editor. Use the arrow keys to move the cell cursor, Enter or Space to act at the cursor. '
-    + 'On a marker, press M to pick it up and move it, or T to change its type. Escape to cancel.');
+    + 'On a marker, press M to pick it up and move it, or T to change its type. '
+    + 'Press the Menu key or Shift+F10 for actions at the cursor. Escape to cancel.');
 
   let cursor: CellPosition | null = null;
   let anchor: PendingAnchor | null = null;
+  /** Set while opening the context menu: focusing a menu item transiently blurs the
+      map, and that blur must NOT tear down the cursor (the menu closes back to the
+      map with the cursor intact). Distinguishes this from a real tab-away blur. */
+  let openingMenu = false;
   /** The index of a marker "picked up" for a keyboard move, or null. Like `anchor`,
       it is a transient gesture state cleared on commit, cancel, or blur. */
   let heldMarker: number | null = null;
@@ -89,6 +98,24 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     if (group) group.remove();
   }
 
+  /** The client (viewport) pixel centre of a grid cell — the inverse of the
+      client→cell math in grid.ts (cellFromClient), so the keyboard-opened context
+      menu anchors exactly where a pointer click on that cell would have. Null only
+      when the map SVG is not yet rendered. */
+  function clientPointForCell(dungeon: Dungeon, cell: CellPosition): { clientX: number; clientY: number } | null {
+    const svg = dmSvg();
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const contentWidth = dungeon.grid.width * dungeon.grid.cell;
+    const contentHeight = dungeon.grid.height * dungeon.grid.cell;
+    const scaleX = contentWidth ? rect.width / contentWidth : 0;
+    const scaleY = contentHeight ? rect.height / contentHeight : 0;
+    return {
+      clientX: rect.left + (cell.x + 0.5) * dungeon.grid.cell * scaleX,
+      clientY: rect.top + (cell.y + 0.5) * dungeon.grid.cell * scaleY,
+    };
+  }
+
   editor.subscribe(() => {
     // A held marker is a raw index into the live dungeon; any store change we did
     // not initiate here — above all an undo/redo, which restores a FRESH snapshot
@@ -128,8 +155,9 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     const element = document.getElementById('mode-hint');
     const dungeon = getDungeon();
     if (!element || !cursor || !dungeon) return;
+    const cellDescription = describeCell(dungeon, cursor);
     let text = 'Row ' + (cursor.y + 1) + ', column ' + (cursor.x + 1) + ' — '
-      + describeCell(dungeon, cursor) + '. ' + actionHint();
+      + cellDescription + '. ' + actionHint();
     // With no tool/mode active and a marker under the cursor, surface the move/retype gestures.
     if (heldMarker === null && !modes.current && !modes.selectedMarkerType) {
       const markerIndex = markerAtCell(dungeon, cursor.x, cursor.y);
@@ -137,6 +165,9 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
       // the (S) badge can be moved (it relocates the secret) but never retyped.
       if (marker?.type === 'secret') text += ' M to move the secret.';
       else if (marker) text += ' M to move, T to change type.';
+      // Any actionable feature (not empty space) has a context menu at the cursor,
+      // mirroring where a pointer right-click would open one.
+      if (cellDescription !== 'empty') text += ' Menu key or Shift+F10 for actions.';
     }
     element.textContent = text;
     element.hidden = false;
@@ -216,6 +247,25 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     editor.retypeMarker(index, next);
   }
 
+  // ---- keyboard context menu (ContextMenu / Shift+F10) — opens the same accessible
+  //      cell menu the pointer opens on right-click, at the cursor cell ----
+  function openCellMenuAtCursor(dungeon: Dungeon, position: CellPosition): void {
+    // A pending gesture would sit stranded behind the menu (and a stale held index
+    // must never survive to act later — the N1 bug class); cancel it first, matching
+    // Escape's semantics. This is a pure UI-state reset, not an editor mutation.
+    if (heldMarker !== null) cancelHeld();
+    if (anchor) dropAnchor();
+    paintCursor();                                              // drop any "holding" outline
+    const point = clientPointForCell(dungeon, position);
+    if (!point) return;
+    // openContextMenu is itself a no-op on a cell with no feature (empty/void space),
+    // exactly like a pointer right-click there. The menu focuses its first item, which
+    // blurs the map — guard that blur so the cursor survives the round-trip.
+    openingMenu = true;
+    openContextMenu(position.x, position.y, point.clientX, point.clientY);
+    openingMenu = false;
+  }
+
   function actInStructureMode(dungeon: Dungeon, mode: Exclude<EditMode, null>, position: CellPosition): void {
     const active = validAnchor();
     if (!active) {
@@ -288,6 +338,13 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
       announceCursor();
       return;
     }
+    // Standard "open context menu from the keyboard" bindings (WAI-ARIA APG):
+    // the dedicated Menu key and Shift+F10 (the fallback for keyboards without one).
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+      event.preventDefault();
+      openCellMenuAtCursor(dungeon, ensureCursor(dungeon));
+      return;
+    }
     if (event.key === 'Escape') {
       // consume: cancel the pending grab/anchor but stay in the mode (the structure
       // controller's window-level Esc exits the mode when nothing is pending)
@@ -304,6 +361,7 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
   });
 
   dmWrap.addEventListener('blur', () => {
+    if (openingMenu) return;                                    // transient focus move into the cell menu; keep the cursor
     cancelHeld();
     dropAnchor();
     hideCursor();
