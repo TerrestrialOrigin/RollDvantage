@@ -526,3 +526,89 @@ test('map surface and legend buttons are tab-reachable with a visible focus indi
     () => getComputedStyle(document.querySelector('.legend-item[data-marker-type="entrance"]')!).outlineStyle);
   expect(buttonOutline).toBe('solid');
 });
+
+/* ---- Keyboard context menu (R2): the ContextMenu key / Shift+F10 opens the same
+   accessible cell menu the pointer opens on right-click, at the cursor cell — giving
+   keyboard parity for the otherwise pointer-only Delete-one-marker and Make-Not-Secret.
+   Every menu action still routes through the DungeonEditor verbs. ---- */
+
+test('Shift+F10 opens the cell menu at the cursor; Delete removes one marker without destroying floor (R2)', async ({ page }) => {
+  const floorBefore = await page.locator('#dm-map .floor rect').count();
+  const before = await page.locator('#dm-map .mk').count();
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before + 1);
+
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('Shift+F10');                          // open the cell menu at the cursor
+
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();   // focus on the first item
+  await page.keyboard.press('Enter');                             // activate Delete by keyboard
+
+  await expect(page.getByRole('menu')).toHaveCount(0);            // menu closed
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before);  // exactly the one marker is gone
+  await expect(page.locator('#dm-map .floor rect')).toHaveCount(floorBefore);   // floor intact — Delete-mode would shrink it
+});
+
+test('the (S) badge cell menu offers Make Not Secret by keyboard (R2)', async ({ page }) => {
+  const badge = { x: 15, y: 12 };
+  const before = await readSecretState(page);
+  expect(before.secretBadges, 'fixture ships one (S) badge at 15,12').toContain(badge.x + ',' + badge.y);
+
+  await moveCursorTo(page, badge.x, badge.y);
+  await page.keyboard.press('ContextMenu');                       // the dedicated Menu key
+
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('ArrowDown');                         // Delete -> Make Not Secret
+  const makeNotSecret = menu.getByRole('menuitem', { name: 'Make Not Secret' });
+  await expect(makeNotSecret).toBeFocused();
+  await page.keyboard.press('Enter');                             // un-secret via editor.unmakeSecret
+
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect.poll(async () => (await readSecretState(page)).secretBadges).not.toContain(badge.x + ',' + badge.y);
+  const after = await readSecretState(page);
+  expect(after.secretFloor).not.toContain(badge.x + ',' + badge.y);   // no longer secret floor
+  expect(after.baseFloor).toContain(badge.x + ',' + badge.y);         // reverted to visible floor
+});
+
+test('the menu key on an empty cell opens no menu (denial) though it opens on a feature cell (R2)', async ({ page }) => {
+  const before = await page.locator('#dm-map .mk').count();
+  const floorBefore = await page.locator('#dm-map .floor rect').count();
+
+  // control: the same key DOES open a menu on a real feature cell (distinguishes
+  // "correctly absent" from "the key does nothing")
+  const feature = await findPlaceableCell(page);
+  await moveCursorTo(page, feature.x, feature.y);
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+
+  // denial: on empty/void space the same key opens nothing and mutates nothing
+  const empty = await findEmptyCell(page);
+  await moveCursorTo(page, empty.x, empty.y);
+  await expect(page.locator('#kbd-cursor rect')).toHaveCount(1);   // positive signal: the cursor is on the empty cell
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menu')).toHaveCount(0);             // no menu opened
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before);   // dungeon unchanged
+  await expect(page.locator('#dm-map .floor rect')).toHaveCount(floorBefore);
+});
+
+test('a keyboard-opened cell menu exposes menuitems and restores focus to the map on Escape (R2)', async ({ page }) => {
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('Shift+F10');
+
+  await expect(page.getByRole('menu')).toBeVisible();
+  await expect(page.getByRole('menuitem').first()).toBeFocused();   // focus moved into the menu
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect.poll(async () => page.evaluate(() => document.activeElement?.id)).toBe('dm-map');   // focus back on the map
+  await expect(page.locator('#kbd-cursor rect')).toHaveCount(1);     // cursor still present
+});

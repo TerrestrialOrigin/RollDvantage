@@ -24,6 +24,7 @@ interface Stack {
   getDungeon: () => Dungeon;
   openNoteAtCell: Mock<(cellX: number, cellY: number) => void>;
   structureModes: StructureModeHandles;
+  openContextMenu: Mock<(gridX: number, gridY: number, clientX: number, clientY: number) => void>;
 }
 
 function realStack(dungeon?: Dungeon): Stack {
@@ -35,12 +36,14 @@ function realStack(dungeon?: Dungeon): Stack {
   const modes: ModeState = { current: null, selectedMarkerType: null };
   const structureModes: StructureModeHandles = { setMode: vi.fn(), updateModeHint: vi.fn(), detach: vi.fn() };
   const openNoteAtCell: Mock<(cellX: number, cellY: number) => void> = vi.fn();
+  const openContextMenu: Mock<(gridX: number, gridY: number, clientX: number, clientY: number) => void> = vi.fn();
   return {
     editor,
     context: { editor, getDungeon: () => store.getCurrent()!, modes },
     getDungeon: () => store.getCurrent()!,
     openNoteAtCell,
     structureModes,
+    openContextMenu,
   };
 }
 
@@ -69,7 +72,7 @@ function emptyCell(dungeon: Dungeon): { x: number; y: number } {
 function setup(dungeon?: Dungeon): Stack {
   document.body.innerHTML = '<div id="dm-map"><svg></svg></div><div id="mode-hint"></div>';
   const stack = realStack(dungeon);
-  attachKeyboardEditController({ ...stack.context, openNoteAtCell: stack.openNoteAtCell, structureModes: stack.structureModes });
+  attachKeyboardEditController({ ...stack.context, openNoteAtCell: stack.openNoteAtCell, structureModes: stack.structureModes, openContextMenu: stack.openContextMenu });
   return stack;
 }
 
@@ -310,5 +313,76 @@ describe('keyboard secret (S) badge retype', () => {
     const atBadge = dungeon.markers.find((marker) => marker.x === badge.x && marker.y === badge.y);
     expect(atBadge?.type).toBe('secret');                      // still a secret badge (becomes 'boss' today)
     expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(1); // secret floor intact
+  });
+});
+
+/* ---- Keyboard context menu (R2): the ContextMenu key / Shift+F10 opens the same
+   accessible cell menu the pointer opens on right-click, at the cursor cell — giving
+   keyboard parity for the otherwise pointer-only Delete-one-marker and Make-Not-Secret.
+   The unit under test is the wiring + cursor→grid mapping; openContextMenu is spied. */
+describe('keyboard context menu open', () => {
+  it('ContextMenu key over a marker opens the menu at the marker cell', () => {
+    const stack = setup();
+    const dungeon = stack.getDungeon();
+    const cell = placeableCell(dungeon);
+    stack.editor.addMarker('monster', cell.x, cell.y);
+
+    walkTo(stack.getDungeon(), cell.x, cell.y);
+    press('ContextMenu');
+
+    expect(stack.openContextMenu).toHaveBeenCalledTimes(1);
+    const call = stack.openContextMenu.mock.calls[0]!;
+    expect([call[0], call[1]]).toEqual([cell.x, cell.y]);      // opened at the cursor's grid cell
+    expect(typeof call[2]).toBe('number');                     // a client point was supplied
+    expect(typeof call[3]).toBe('number');
+  });
+
+  it('Shift+F10 over a marker opens the menu at the marker cell (keyboards without a Menu key)', () => {
+    const stack = setup();
+    const dungeon = stack.getDungeon();
+    const cell = placeableCell(dungeon);
+    stack.editor.addMarker('monster', cell.x, cell.y);
+
+    walkTo(stack.getDungeon(), cell.x, cell.y);
+    press('F10', { shiftKey: true });
+
+    expect(stack.openContextMenu).toHaveBeenCalledTimes(1);
+    const call = stack.openContextMenu.mock.calls[0]!;
+    expect([call[0], call[1]]).toEqual([cell.x, cell.y]);
+  });
+
+  it('the menu opens at the cursor even on an empty cell — openContextMenu itself no-ops off-feature', () => {
+    // The keyboard path mirrors the pointer path: it always calls openContextMenu at the
+    // cursor, which early-returns when there is no feature there. So the controller does not
+    // pre-filter empty cells; it delegates the "no menu on empty space" decision to the menu.
+    const stack = setup();
+    const dungeon = stack.getDungeon();
+    const empty = emptyCell(dungeon);
+
+    walkTo(dungeon, empty.x, empty.y);
+    press('ContextMenu');
+
+    expect(stack.openContextMenu).toHaveBeenCalledWith(empty.x, empty.y, expect.any(Number), expect.any(Number));
+  });
+
+  it('opening the menu while a marker is held cancels the hold AND opens the menu', () => {
+    const stack = setup();
+    const dungeon = stack.getDungeon();
+    const cell = placeableCell(dungeon);
+    stack.editor.addMarker('monster', cell.x, cell.y);
+    const index = stack.getDungeon().markers.length - 1;
+    const destination = placeableCell(stack.getDungeon(), new Set([cell.x + ',' + cell.y]));
+    const moveSpy = vi.spyOn(stack.editor, 'moveMarker');
+
+    walkTo(stack.getDungeon(), cell.x, cell.y);
+    press('m');                                                 // pick the marker up
+    press('ContextMenu');                                       // opening cancels the hold
+    expect(stack.openContextMenu).toHaveBeenCalledTimes(1);
+
+    // the hold was released: a later Enter at another cell must NOT move the marker
+    walkTo(stack.getDungeon(), destination.x, destination.y);
+    press('Enter');
+    expect(moveSpy).not.toHaveBeenCalled();
+    expect({ x: stack.getDungeon().markers[index]!.x, y: stack.getDungeon().markers[index]!.y }).toEqual(cell);
   });
 });

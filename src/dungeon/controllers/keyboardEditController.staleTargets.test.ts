@@ -63,6 +63,7 @@ function setup(dungeon: Dungeon): Stack {
     ...stack.context,
     openNoteAtCell: vi.fn(),
     structureModes: stack.structureModes,
+    openContextMenu: vi.fn(),
   });
   return stack;
 }
