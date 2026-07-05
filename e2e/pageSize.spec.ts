@@ -34,7 +34,12 @@ async function selectPreset(page: import('@playwright/test').Page, preset: strin
   await page.click('.ps-toggle');
   await page.waitForSelector('.ps-popup:not([hidden])');
   await page.click(`[data-preset="${preset}"]`);
-  await page.waitForTimeout(250);
+  /* Wait on the success post-conditions of a preset choice's apply(): the popup
+     closes and the chosen preset button becomes active. Both hold only after
+     apply() ran — which is exactly where the geometry vars (--page-w) are set —
+     so downstream reads are race-free. Condition-based, never a fixed sleep. */
+  await expect(page.locator('.ps-popup')).toBeHidden();
+  await expect(page.locator(`[data-preset="${preset}"]`)).toHaveClass(/active/);
 }
 
 test('selecting a preset resizes the page and persists across reload', async ({ page }) => {
@@ -61,8 +66,11 @@ test('invalid custom size is rejected and keeps the previous size', async ({ pag
   await page.fill('.ps-w', '0');
   await page.fill('.ps-h', '9');
   await page.click('.ps-apply');
-  await page.waitForTimeout(100);
-  expect(await page.locator('.ps-msg').textContent()).toBeTruthy();
+  /* Positive-first: wait for the validation message to appear (it only appears
+     after the apply handler ran and REJECTED the input), THEN assert the size
+     variable is unchanged — so we distinguish "correctly rejected" from
+     "handler hasn't run yet". Never assert-absence right after a sleep. */
+  await expect(page.locator('.ps-msg')).not.toBeEmpty();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--page-w').trim())).toBe('210mm');
 });
 

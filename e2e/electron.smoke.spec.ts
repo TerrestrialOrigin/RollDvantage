@@ -33,6 +33,74 @@ test.afterAll(async () => {
   await electronApp?.close();
 });
 
+/* ---- Durable-consequence observers for the denial tests ----
+   Instead of sleeping and asserting "nothing changed" (which false-passes when
+   the guarded thing merely happens slower than the sleep), we watch the MAIN
+   process for the guard actually firing. The app registers its will-navigate /
+   window-open guards at window creation (in beforeAll), strictly before any
+   test body runs — so our observer's will-navigate listener runs AFTER the
+   guard and reads the guard's preventDefault via `defaultPrevented`. Each
+   listener is installed once; the recorded state is reset at each test start.
+   Globals are namespaced to avoid colliding with app/Electron globals. */
+
+type NavObservationGlobal = typeof globalThis & {
+  __rollDvantageNav?: { url: string; prevented: boolean } | null;
+  __rollDvantageNavInstalled?: boolean;
+};
+type ChildWindowGlobal = typeof globalThis & {
+  __rollDvantageChildWindow?: boolean;
+  __rollDvantageChildWindowInstalled?: boolean;
+};
+
+/** Reset (and, once, install) a main-process will-navigate observer. */
+async function resetNavigationObserver(): Promise<void> {
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    const scope = globalThis as NavObservationGlobal;
+    scope.__rollDvantageNav = null;
+    if (scope.__rollDvantageNavInstalled) return;
+    const firstWindow = BrowserWindow.getAllWindows()[0];
+    if (!firstWindow) throw new Error('no Electron window');
+    firstWindow.webContents.on('will-navigate', (event, targetUrl) => {
+      (globalThis as NavObservationGlobal).__rollDvantageNav = {
+        url: targetUrl,
+        prevented: event.defaultPrevented,
+      };
+    });
+    scope.__rollDvantageNavInstalled = true;
+  });
+}
+
+/** Poll until the guard has prevented a navigation to `targetUrlSubstring`. */
+async function expectNavigationBlocked(targetUrlSubstring: string): Promise<void> {
+  await expect
+    .poll(async () =>
+      electronApp.evaluate(
+        () => (globalThis as NavObservationGlobal).__rollDvantageNav?.prevented === true,
+      ),
+    )
+    .toBe(true);
+  const observed = await electronApp.evaluate(
+    () => (globalThis as NavObservationGlobal).__rollDvantageNav,
+  );
+  // Confirm it was THIS navigation the guard blocked, not a stale/other one.
+  expect(observed?.url).toContain(targetUrlSubstring);
+}
+
+/** Reset (and, once, install) a main-process did-create-window observer. */
+async function resetChildWindowObserver(): Promise<void> {
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    const scope = globalThis as ChildWindowGlobal;
+    scope.__rollDvantageChildWindow = false;
+    if (scope.__rollDvantageChildWindowInstalled) return;
+    const firstWindow = BrowserWindow.getAllWindows()[0];
+    if (!firstWindow) throw new Error('no Electron window');
+    firstWindow.webContents.on('did-create-window', () => {
+      (globalThis as ChildWindowGlobal).__rollDvantageChildWindow = true;
+    });
+    scope.__rollDvantageChildWindowInstalled = true;
+  });
+}
+
 test('launches sandboxed with no privileged renderer surface', async () => {
   await expect(appWindow.locator('#dm-map svg.dmap')).toBeVisible();
   await expect(appWindow.locator('#player-map svg.dmap')).toBeVisible();
@@ -201,24 +269,34 @@ test('New → Save → Load round-trip works inside the sandboxed shell', async 
 });
 
 test('denies window.open (denial case)', async () => {
+  await resetChildWindowObserver();
   const windowCountBefore = electronApp.windows().length;
-  /* Note: window.open's return value is racy under a main-process deny (the
-     renderer creates its WindowProxy synchronously), so the reliable assertion
-     is that no actual window ever gets created. */
+  /* window.open's return value is racy under a main-process deny (the renderer
+     creates its WindowProxy synchronously), so we don't assert on it. The deny
+     decision runs synchronously in main while window.open is in flight, so once
+     the follow-up main-process round-trip below resolves, a would-be child
+     window would already exist — a causal checkpoint, not a timer. */
   await appWindow.evaluate(() => {
     window.open('https://example.com');
   });
-  await appWindow.waitForTimeout(500);
+  const childWindowCreated = await electronApp.evaluate(
+    () => (globalThis as ChildWindowGlobal).__rollDvantageChildWindow === true,
+  );
+  expect(childWindowCreated).toBe(false);
   expect(electronApp.windows().length).toBe(windowCountBefore);
   await expect(appWindow.locator('#dm-map svg.dmap')).toBeVisible();
 });
 
 test('blocks navigation to an external origin (denial case)', async () => {
+  await resetNavigationObserver();
   const urlBefore = appWindow.url();
   await appWindow.evaluate(() => {
     window.location.href = 'https://example.com';
   });
-  await appWindow.waitForTimeout(1000);
+  /* Durable consequence: the main-process guard's will-navigate preventDefault
+     fired for THIS target — proves "blocked", not merely "hasn't navigated yet"
+     (an allowed nav would report prevented:false and then change the URL). */
+  await expectNavigationBlocked('example.com');
   expect(appWindow.url()).toBe(urlBefore);
   /* Editor state is intact: the rendered dungeon is still there. Asserted via
      evaluate — locators would wait forever on the prevented (never-committing)
@@ -233,12 +311,13 @@ test('blocks navigation to a file outside the app directory (denial case)', asyn
   /* The guard now allows the app's OWN bundled pages (License.html) but must
      still block any file:// URL outside the install directory — the classic
      containment bypass. A sibling/temp file must not be loadable. */
+  await resetNavigationObserver();
   const urlBefore = appWindow.url();
   const outsideFileUrl = pathToFileURL(join(tmpdir(), 'not-the-app.html')).href;
   await appWindow.evaluate((target) => {
     window.location.href = target;
   }, outsideFileUrl);
-  await appWindow.waitForTimeout(1000);
+  await expectNavigationBlocked('not-the-app.html');
   expect(appWindow.url()).toBe(urlBefore);
   const dungeonStillRendered = await appWindow.evaluate(
     () => document.querySelector('#dm-map svg.dmap') !== null,
