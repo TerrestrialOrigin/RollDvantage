@@ -3,13 +3,8 @@
    A reusable stylesheet for printable, fillable "tome" documents:
    questionnaires, worksheets, journals, character sheets.
 
-   Load order in any document:
-     1. The Google Fonts link (see _fonts snippet below / README)
-     2. <link rel="stylesheet" href="chronicle.css">
-     3. <script src="chronicle.js"></script>  (optional: scaling + persistence)
-
-   FONT LINK (paste into <head>):
-   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+   Fonts (Cinzel, Cinzel Decorative, Cormorant Garamond) are self-hosted and
+   registered by src/styles/fonts.css, imported ahead of this file in main.ts.
    ============================================================ */
 
 :root{
