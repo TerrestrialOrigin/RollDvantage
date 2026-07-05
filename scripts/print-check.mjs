@@ -9,16 +9,20 @@
    Usage:  npm run print-check     (or: node scripts/print-check.mjs)
    Exit code is non-zero if any check fails.
    ============================================================ */
-import { chromium, firefox } from 'playwright';
+import { chromium, firefox } from '@playwright/test';
 import { spawn, execSync } from 'node:child_process';
 import { existsSync, statSync, mkdtempSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { createConnection } from 'node:net';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '..');
 const FIXTURE = resolve(REPO, 'e2e/fixtures/seed-c0ffee.dungeon');
+// Spawn the Vite binary directly (not via the `npx` wrapper) so the teardown
+// SIGTERM reaches Vite itself and cannot leave an orphan holding PORT (N3).
+const VITE_BIN = resolve(REPO, 'node_modules/.bin/vite');
 const PORT = 5199;
 const BASE = `http://localhost:${PORT}/`;
 const TMP = mkdtempSync(resolve(tmpdir(), 'print-check-'));
@@ -27,6 +31,15 @@ const checks = [];
 function record(name, ok, detail = '') {
   checks.push(ok);
   console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}${detail ? ` — ${detail}` : ''}`);
+}
+
+// Resolves true when nothing accepts a TCP connection on the port (server gone).
+function isPortFree(port) {
+  return new Promise((resolveFree) => {
+    const socket = createConnection({ host: '127.0.0.1', port });
+    socket.once('connect', () => { socket.destroy(); resolveFree(false); });
+    socket.once('error', () => { socket.destroy(); resolveFree(true); });
+  });
 }
 
 async function loadPrinted(page) {
@@ -90,7 +103,7 @@ async function firefoxChecks() {
 let server;
 try {
   console.log(`Starting dev server on :${PORT} …`);
-  server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { cwd: REPO, stdio: 'ignore' });
+  server = spawn(VITE_BIN, ['--port', String(PORT), '--strictPort'], { cwd: REPO, stdio: 'ignore' });
   let up = false;
   for (let i = 0; i < 120; i++) {
     try { const response = await fetch(BASE); if (response.ok) { up = true; break; } } catch { /* not ready */ }
@@ -102,7 +115,20 @@ try {
   console.log('\nFirefox print checks (real Mozilla Save to PDF):');
   await firefoxChecks();
 } finally {
-  if (server) server.kill('SIGTERM');
+  if (server) {
+    // Signal Vite directly and wait for it to actually exit, then confirm the
+    // port is released — so a run can never leave an orphan squatting on PORT.
+    const exited = new Promise((resolveExit) => server.once('exit', resolveExit));
+    server.kill('SIGTERM');
+    await exited;
+    const portFree = await isPortFree(PORT);
+    if (!portFree) {
+      console.error(`\x1b[31m✗\x1b[0m dev server still bound to :${PORT} after teardown`);
+      process.exitCode = 1;
+    } else {
+      console.log(`  \x1b[32m✓\x1b[0m dev server torn down; :${PORT} free`);
+    }
+  }
 }
 
 const passed = checks.filter(Boolean).length;
