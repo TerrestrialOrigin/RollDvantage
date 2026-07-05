@@ -408,6 +408,87 @@ test('T cycles a marker type forward and Shift+T backward, announced in the live
   await expect(page.locator('#mode-hint')).toContainText('monster marker');
 });
 
+/* ---- Secret (S) badge (R1): the badge's position IS the secret status of the
+   floor beneath it. Keyboard move must relocate the SECRET (not orphan the badge),
+   and keyboard retype must never cycle the badge into a placeable type. The
+   seed-c0ffee fixture ships one (S) badge at (15,12) on a vertical secret passage. */
+
+const SECRET_FILL = 'oklch(0.905 0.05 80)';                     // palette.ts SECRET_FILL — the DM secret-floor tint
+
+interface SecretState {
+  baseFloor: string[];                                          // "x,y" of visible base-floor cells
+  secretFloor: string[];                                        // "x,y" of secret-floor (gold-tint) cells
+  secretBadges: string[];                                       // "x,y" of every (S) badge glyph
+}
+
+/** Read the DM map's secret geometry straight from the live SVG (no mocks). */
+async function readSecretState(page: Page): Promise<SecretState> {
+  return page.evaluate((secretFill) => {
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const firstFloorRect = svg.querySelector<SVGRectElement>('.floor rect')!;
+    const cell = parseFloat(firstFloorRect.getAttribute('width')!);
+    const baseFloor: string[] = [], secretFloor: string[] = [];
+    svg.querySelectorAll<SVGRectElement>('.floor rect').forEach((rect) => {
+      const cellX = Math.round(parseFloat(rect.getAttribute('x')!) / cell);
+      const cellY = Math.round(parseFloat(rect.getAttribute('y')!) / cell);
+      (rect.getAttribute('fill') === secretFill ? secretFloor : baseFloor).push(cellX + ',' + cellY);
+    });
+    const secretBadges: string[] = [];
+    svg.querySelectorAll('g.mk').forEach((group) => {
+      const letter = group.querySelector('text.mk-gold');
+      if (letter?.textContent === 'S') {
+        const box = (group as SVGGElement).getBBox();
+        secretBadges.push(Math.floor((box.x + box.width / 2) / cell) + ',' + Math.floor((box.y + box.height / 2) / cell));
+      }
+    });
+    return { baseFloor, secretFloor, secretBadges };
+  }, SECRET_FILL);
+}
+
+test('keyboard-moving the (S) badge relocates the secret and never orphans the badge (R1)', async ({ page }) => {
+  const before = await readSecretState(page);
+  const badge = { x: 15, y: 12 };
+  expect(before.secretBadges, 'fixture ships one (S) badge at 15,12').toContain(badge.x + ',' + badge.y);
+  expect(before.secretFloor).toContain(badge.x + ',' + badge.y);
+
+  // pick a convertible destination: any visible base-floor cell not occupied by a marker
+  const occupied = new Set(await occupiedCells(page));
+  const destination = before.baseFloor
+    .map((key) => { const [x, y] = key.split(',').map(Number); return { key, x: x!, y: y! }; })
+    .find((candidate) => !occupied.has(candidate.key));
+  expect(destination, 'fixture must have a free base-floor destination').toBeTruthy();
+
+  await moveCursorTo(page, badge.x, badge.y);
+  await page.keyboard.press('m');                                // pick up the (S) badge
+  await expect(page.locator('#kbd-cursor rect.holding')).toHaveCount(1);
+  await stepBy(page, destination!.x - badge.x, destination!.y - badge.y);
+  await page.keyboard.press('Enter');                            // drop → moves the SECRET
+
+  // positive signals first: the destination became secret AND the origin returned to visible floor
+  await expect.poll(async () => (await readSecretState(page)).secretFloor)
+    .toContain(destination!.x + ',' + destination!.y);
+  const after = await readSecretState(page);
+  expect(after.baseFloor).toContain(badge.x + ',' + badge.y);   // origin un-secreted (secret relocated)
+  expect(after.secretFloor).not.toContain(badge.x + ',' + badge.y);
+  // no (S) badge is stranded on non-secret floor — the corruption this change fixes
+  for (const badgeCell of after.secretBadges) expect(after.secretFloor).toContain(badgeCell);
+});
+
+test('keyboard retype (t) on the (S) badge is a no-op — the secret is never cycled away (R1)', async ({ page }) => {
+  const badge = { x: 15, y: 12 };
+  const before = await readSecretState(page);
+  expect(before.secretBadges).toContain(badge.x + ',' + badge.y);
+
+  await moveCursorTo(page, badge.x, badge.y);
+  await expect(page.locator('#mode-hint')).toContainText('M to move the secret');   // no "T to change type"
+  await page.keyboard.press('t');
+  await page.keyboard.press('Shift+T');
+
+  const after = await readSecretState(page);
+  expect(after.secretBadges).toContain(badge.x + ',' + badge.y);   // still an (S) badge (would become 'boss' before the fix)
+  expect(after.secretFloor).toContain(badge.x + ',' + badge.y);    // secret floor intact
+});
+
 test('map surface and legend buttons are tab-reachable with a visible focus indicator', async ({ page }) => {
   await tabTo(page, '#dm-map');
   const mapOutline = await page.evaluate(() => getComputedStyle(document.querySelector('#dm-map')!).outlineStyle);

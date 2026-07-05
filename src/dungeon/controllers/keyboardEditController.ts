@@ -11,6 +11,7 @@
 import type { Dungeon, MarkerType } from '../model/types';
 import { corridorCells } from '../geometry/grid';
 import { placeable, roomIndexAt, isCorridorCell, isBaseFloor } from '../geometry/topology';
+// roomIndexAt / isCorridorCell also gate the secret-badge move (see dropHeldMarker).
 import { markerAtCell } from '../editing/featureQueries';
 import { dmSvg, clearPreview } from './mapSurface';
 import { drawRoomPreview, drawCorridorPreview, drawDeletePreview } from './previews';
@@ -119,9 +120,12 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     let text = 'Row ' + (cursor.y + 1) + ', column ' + (cursor.x + 1) + ' — '
       + describeCell(dungeon, cursor) + '. ' + actionHint();
     // With no tool/mode active and a marker under the cursor, surface the move/retype gestures.
-    if (heldMarker === null && !modes.current && !modes.selectedMarkerType
-        && markerAtCell(dungeon, cursor.x, cursor.y) >= 0) {
-      text += ' M to move, T to change type.';
+    if (heldMarker === null && !modes.current && !modes.selectedMarkerType) {
+      const markerIndex = markerAtCell(dungeon, cursor.x, cursor.y);
+      const marker = markerIndex >= 0 ? dungeon.markers[markerIndex] : undefined;
+      // the (S) badge can be moved (it relocates the secret) but never retyped.
+      if (marker?.type === 'secret') text += ' M to move the secret.';
+      else if (marker) text += ' M to move, T to change type.';
     }
     element.textContent = text;
     element.hidden = false;
@@ -167,6 +171,21 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     if (heldMarker === null) return;
     if (!placeable(dungeon, position.x, position.y)) return;   // denied drop: stay held for another attempt
     const index = heldMarker;
+    const marker = dungeon.markers[index];
+    if (marker?.type === 'secret') {
+      // the (S) badge IS the secret status — a keyboard drop MOVES the secret, never
+      // the raw badge (mirrors the pointer path in dragPlaceController.onUp). Dropping
+      // always ends the hold; an ineligible destination leaves the secret untouched.
+      heldMarker = null;
+      const alreadySecret = dungeon.secretFloor?.[position.y]?.[position.x] === 1;
+      const canConvert = !alreadySecret
+        && (roomIndexAt(dungeon, position.x, position.y) >= 0 || isCorridorCell(dungeon, position.x, position.y));
+      if (canConvert) {
+        editor.unmakeSecret(marker.x, marker.y);   // restore the origin room/passage
+        editor.makeSecret(position.x, position.y); // make the dropped-on room/corridor secret
+      }
+      return;
+    }
     heldMarker = null;
     editor.moveMarker(index, position.x, position.y);          // preserves note/label; re-derives entrance/exit dir
   }
@@ -179,6 +198,7 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     const index = markerAtCell(dungeon, position.x, position.y);
     const marker = index >= 0 ? dungeon.markers[index] : undefined;
     if (!marker) return;
+    if (marker.type === 'secret') return;   // the (S) badge is a status indicator, never a cyclable type (matches featureAt)
     const current = RETYPE_ORDER.indexOf(marker.type);
     const base = current < 0 ? 0 : current;
     const next = RETYPE_ORDER[(base + direction + RETYPE_ORDER.length) % RETYPE_ORDER.length]!;
