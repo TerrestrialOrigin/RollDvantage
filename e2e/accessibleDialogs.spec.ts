@@ -143,6 +143,30 @@ test('background undo shortcut does not fire from inside the dialog (denial)', a
   await expect(page.locator('.ck-box').filter({ hasText: 'The first note' })).toHaveCount(1);   // not undone
 });
 
+test('undo from a note dialog BUTTON does not strand the note target — the save persists (N1)', async ({ page }) => {
+  // First save creates an undo step AND a Contents-Key entry to reopen.
+  await openNoteDialogByKeyboard(page);
+  await page.locator('#note-text').fill('Original note');
+  await page.click('#note-save');
+  await expect(page.locator('.ck-box').filter({ hasText: 'Original note' })).toHaveCount(1);
+
+  // Reopen the same feature, move focus to the Save BUTTON (NOT the textarea, so
+  // the text-field guard does not apply), and press Ctrl+Z. Pre-fix this undoes
+  // the first save and detaches the note target, so the next save is lost.
+  await openNoteDialogByKeyboard(page);
+  await expect(page.locator('#note-text')).toHaveValue('Original note');
+  await page.locator('#note-save').focus();
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#note-modal')).toBeVisible();       // dialog still open, target still live
+
+  await page.locator('#note-text').fill('Updated note that must survive');
+  await page.click('#note-save');
+  await expect(page.locator('#note-modal')).toBeHidden();
+  // The updated note landed on the LIVE feature (not a stranded copy).
+  await expect(page.locator('.ck-box').filter({ hasText: 'Updated note that must survive' })).toHaveCount(1);
+  await expect(page.locator('.ck-box').filter({ hasText: 'Original note' })).toHaveCount(0);   // replaced, not lost
+});
+
 /* ---------------- generate warning ---------------- */
 
 /** Dirty the dungeon (name edit), then open Generate and pick the first mode —

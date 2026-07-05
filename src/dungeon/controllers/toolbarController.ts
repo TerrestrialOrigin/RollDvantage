@@ -100,6 +100,12 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const active = document.activeElement;                       // never hijack text editing
     if (active && ((active as HTMLElement).isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+    // A focus-trapped modal dialog (note editor, generate warning) owns the keyboard:
+    // a snapshot restore here would swap the dungeon out from under an in-progress
+    // edit whose target references the pre-restore dungeon (e.g. the note dialog's
+    // Save/Cancel buttons are not text fields, so Ctrl+Z would otherwise slip through
+    // and strand the note target). Suppress undo/redo while such a dialog is open.
+    if (active?.closest('[role="dialog"]:not([hidden])')) return;
     const key = event.key.toLowerCase();
     if (key === 'z' && !event.shiftKey) { event.preventDefault(); editor.undo(); }
     else if (key === 'y' || (key === 'z' && event.shiftKey)) { event.preventDefault(); editor.redo(); }

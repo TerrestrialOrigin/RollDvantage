@@ -489,6 +489,33 @@ test('keyboard retype (t) on the (S) badge is a no-op — the secret is never cy
   expect(after.secretFloor).toContain(badge.x + ',' + badge.y);    // secret floor intact
 });
 
+test('undo while holding a marker releases the hold — a later Enter annotates, never drops a stale index (N1)', async ({ page }) => {
+  const baseline = await page.locator('#dm-map .mk').count();
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+  await expect(page.locator('#dm-map .mk')).toHaveCount(baseline + 1);
+
+  // Pick the marker up, then undo the placement out from under the hold.
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('m');
+  await expect(page.locator('#kbd-cursor rect.holding')).toHaveCount(1);   // holding
+  await page.keyboard.press('Control+z');                                  // restores the pre-placement snapshot
+
+  // Durable consequence 1: the placement is undone and the hold is released
+  // (the "holding" cursor reverts to the plain cursor after the re-render).
+  await expect(page.locator('#dm-map .mk')).toHaveCount(baseline);
+  await expect(page.locator('#kbd-cursor rect.holding')).toHaveCount(0);
+  await expect(page.locator('#kbd-cursor rect')).toHaveCount(1);
+
+  // Durable consequence 2: Enter now falls through to annotate (hold released),
+  // rather than dropping a marker at the now-stale index.
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#note-modal')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#note-modal')).toBeHidden();
+  await expect(page.locator('#dm-map .mk')).toHaveCount(baseline);         // no marker moved or created
+});
+
 test('map surface and legend buttons are tab-reachable with a visible focus indicator', async ({ page }) => {
   await tabTo(page, '#dm-map');
   const mapOutline = await page.evaluate(() => getComputedStyle(document.querySelector('#dm-map')!).outlineStyle);

@@ -89,7 +89,18 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     if (group) group.remove();
   }
 
-  editor.subscribe(() => { if (cursor) paintCursor(); });
+  editor.subscribe(() => {
+    // A held marker is a raw index into the live dungeon; any store change we did
+    // not initiate here — above all an undo/redo, which restores a FRESH snapshot
+    // in place of the current dungeon — leaves the index pointing at the wrong or
+    // absent marker. Release the hold so a later Enter cannot act on a stale index.
+    // Safe against a legitimate drop: dropHeldMarker nulls heldMarker BEFORE it
+    // mutates, so this guard only ever finds a hold on an externally-driven change.
+    const releasedHold = heldMarker !== null;
+    if (releasedHold) cancelHeld();
+    if (cursor) paintCursor();                       // repaint drops the "holding" outline
+    if (releasedHold && cursor) announceCursor();    // reflect the released hold in the live region
+  });
 
   // ---- live-region status (shares #mode-hint with the structure controller) ----
   function describeCell(dungeon: Dungeon, position: CellPosition): string {
