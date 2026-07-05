@@ -96,6 +96,10 @@
   .kbd-cursor{
     fill:oklch(0.66 0.094 78 / .18); stroke:var(--gold-deep); stroke-width:2.5;
   }
+  /* while carrying a picked-up marker: a stronger, dashed "drop target" cursor */
+  .kbd-cursor.holding{
+    fill:oklch(0.66 0.094 78 / .30); stroke-width:3.5; stroke-dasharray:5 3;
+  }
   @media print{ .legend-item[aria-pressed="true"]{ outline:none; background:none; } }
   .legend-hint{
     font-family:var(--font-body); font-style:italic; font-size:14px;
