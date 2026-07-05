@@ -43,7 +43,7 @@ export function renderContentsKey(annotations: AnnotationEntry[], dungeon: Dunge
   }
   function boxFor(entry: AnnotationEntry): HTMLElement {
     const holder = document.createElement('div');
-    holder.innerHTML = '<div class="ck-box"><div class="ck-letter">' + entry.feature.ref + '</div>' +
+    holder.innerHTML = '<div class="ck-box"><div class="ck-letter">' + escapeHtml(entry.feature.ref) + '</div>' +
       '<div class="ck-body"><div class="ck-type">' + escapeHtml(entryLabel(dungeon, entry)) + '</div>' +
       '<div class="ck-text">' + escapeHtml(entry.feature.note ?? '') + '</div></div></div>';
     const box = holder.firstChild as HTMLElement;

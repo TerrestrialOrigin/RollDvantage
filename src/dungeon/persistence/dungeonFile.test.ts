@@ -128,6 +128,49 @@ describe('structural validation (H4/M3)', () => {
     expect(() => parseDungeonText('not json at all')).toThrow(InvalidDungeonFileError);
     expect(() => parseDungeonText('{"not":"a dungeon"}')).toThrow(InvalidDungeonFileError);
     expect(() => parseDungeonText(JSON.stringify({ ...minimalDungeon(), floor: 'x' }))).toThrow(InvalidDungeonFileError);
+    // R3: a file missing `tally` must be rejected as InvalidDungeonFileError here,
+    // not slip through and throw a raw TypeError later in rendering.
+    const { tally, ...noTally } = minimalDungeon();          // eslint-disable-line @typescript-eslint/no-unused-vars
+    expect(() => parseDungeonText(JSON.stringify(noTally))).toThrow(InvalidDungeonFileError);
+  });
+
+  it('rejects files missing required tally/name/depth or with a non-numeric tally count (R3)', () => {
+    const { tally, ...noTally } = minimalDungeon();          // eslint-disable-line @typescript-eslint/no-unused-vars
+    expect(isValidDungeon(noTally)).toBe(false);              // missing tally would crash domRenderer on tally.rooms
+    const { name, ...noName } = minimalDungeon();             // eslint-disable-line @typescript-eslint/no-unused-vars
+    expect(isValidDungeon(noName)).toBe(false);
+    const { depth, ...noDepth } = minimalDungeon();           // eslint-disable-line @typescript-eslint/no-unused-vars
+    expect(isValidDungeon(noDepth)).toBe(false);
+    expect(isValidDungeon({ ...minimalDungeon(), tally: { rooms: 1, foes: 0, traps: 0, loot: 0 } })).toBe(false); // missing count
+    expect(isValidDungeon({ ...minimalDungeon(), tally: { rooms: 1, foes: 0, traps: 0, loot: 0, secret: 'x' } })).toBe(false); // non-numeric count
+    expect(isValidDungeon({ ...minimalDungeon(), tally: [] })).toBe(false); // wrong shape
+    expect(isValidDungeon({ ...minimalDungeon(), name: 7 })).toBe(false);
+    expect(isValidDungeon({ ...minimalDungeon(), depth: null })).toBe(false);
+  });
+
+  it('rejects non-integer or out-of-bounds coordinates (C4-bounds)', () => {
+    // grid is gw:3, gh:2 — anything at or past those bounds, or fractional, is invalid.
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: 9999, y: 0 }] })).toBe(false); // off-canvas
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: 1.5, y: 0 }] })).toBe(false);  // fractional
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: -1, y: 0 }] })).toBe(false);   // negative
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: 3, y: 0 }] })).toBe(false);    // x === gw
+    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ x: 1, y: 0, w: 3, h: 2 }] })).toBe(false);           // x+w > gw
+    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ x: 0, y: 0, w: 1.5, h: 2 }] })).toBe(false);         // fractional dim
+    expect(isValidDungeon({ ...minimalDungeon(), secretRooms: [{ x: 0, y: 0, w: 4, h: 2 }] })).toBe(false);     // secret room spills
+    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ x1: 0, y1: 0, x2: 99, y2: 0 }] })).toBe(false); // endpoint off-canvas
+    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ x1: 0, y1: 0, x2: 1.5, y2: 0 }] })).toBe(false); // fractional endpoint
+  });
+
+  it('accepts genuine generator output across modes/seeds/levels and existing fixtures (no over-rejection)', () => {
+    for (const mode of ['empty', 'full', 'detailed'] as const) {
+      for (const [seed, level] of [[42, 2], [1, 1], [999, 5], [0xc0ffee, 3]] as const) {
+        expect(isValidDungeon(JSON.parse(JSON.stringify(generateDungeon(seed, level, mode))))).toBe(true);
+      }
+    }
+    const fixtureText = readFileSync(join(__dirname, '../../../e2e/fixtures/seed-c0ffee.dungeon'), 'utf8');
+    expect(isValidDungeon(JSON.parse(fixtureText))).toBe(true);
+    expect(isValidDungeon(minimalDungeon())).toBe(true);
+    expect(isValidDungeon(legacyDungeon())).toBe(true);
   });
 });
 

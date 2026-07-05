@@ -66,6 +66,24 @@ describe('renderContentsKey button semantics', () => {
     expect(hostileBox).toBeDefined();                      // name carried the raw text, inertly
   });
 
+  it('escapes a hostile reference letter at the innerHTML sink (N8)', () => {
+    // relabel() normally overwrites `ref` with a plain [A-Z] letter; escaping must
+    // live at the sink, not rely on that ordering invariant. Inject a hostile ref
+    // AFTER relabel to prove the sink itself is safe.
+    const dungeon = makeAnnotatedDungeon();
+    const annotations = relabel(dungeon);
+    const first = annotations[0];
+    expect(first).toBeDefined();
+    if (!first) return;
+    first.feature.ref = '<img id="ref-pwned" src=x onerror="window.__p=1">';
+    renderContentsKey(annotations, dungeon);
+    expect(document.getElementById('ref-pwned')).toBeNull();
+    expect(document.querySelector('#contents-key img')).toBeNull();
+    const letter = document.querySelector('#contents-key .ck-letter');
+    expect(letter).not.toBeNull();
+    expect(letter!.textContent).toContain('<img id="ref-pwned"'); // rendered as literal text
+  });
+
   it('invokes onLayoutChange after building pages (the typed re-fit signal)', () => {
     const dungeon = makeAnnotatedDungeon();
     let layoutChanges = 0;

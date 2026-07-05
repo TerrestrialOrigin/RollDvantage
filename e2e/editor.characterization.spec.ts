@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = resolve(here, 'fixtures/seed-c0ffee.dungeon');
+const MISSING_TALLY_FIXTURE = resolve(here, 'fixtures/missing-tally.dungeon');
 
 /* ============================================================
    E2E CHARACTERIZATION — real browser, full `npm run dev` stack, no mocks.
@@ -95,6 +96,30 @@ test('rejects an invalid file with an alert and leaves the dungeon unchanged (de
   // unchanged
   await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
   await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore);
+});
+
+test('rejects a well-formed file missing tally instead of crashing rendering (R3 denial)', async ({ page }) => {
+  /* This file is well-formed except it omits the required `tally` — the old
+     validator let it through and rendering then threw on `dungeon.tally.rooms`,
+     producing an unhandled rejection and a half-painted map. It must now be
+     rejected at the load boundary with the clear alert, state untouched. */
+  await page.setInputFiles('#file-load', FIXTURE);
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  const markersBefore = await page.locator('#dm-map .mk').count();
+
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  let alerted = '';
+  page.once('dialog', (dialog) => { alerted = dialog.message(); void dialog.accept(); });
+
+  await page.setInputFiles('#file-load', MISSING_TALLY_FIXTURE);
+
+  await expect.poll(() => alerted).toContain('not a valid RollDvantage dungeon');
+  // state unchanged and no crash leaked to the page
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore);
+  expect(pageErrors).toEqual([]);
 });
 
 test('rejects a structurally hostile file at the boundary and stays editable (denial)', async ({ page }) => {
