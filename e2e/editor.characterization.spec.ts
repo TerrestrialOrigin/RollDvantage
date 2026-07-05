@@ -53,8 +53,8 @@ test('drag-to-place a monster adds exactly one DM marker, undo removes it', asyn
 
   // Compute the client-space center of the first floor cell (guaranteed placeable).
   const point = await page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
-    const rect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const rect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const svgBox = svg.getBoundingClientRect();
     const vb = svg.viewBox.baseVal;
     const scaleX = svgBox.width / vb.width;
@@ -83,7 +83,7 @@ test('rejects an invalid file with an alert and leaves the dungeon unchanged (de
   const markersBefore = await page.locator('#dm-map .mk').count();
 
   let alerted = '';
-  page.once('dialog', (dialog) => { alerted = dialog.message(); dialog.accept(); });
+  page.once('dialog', (dialog) => { alerted = dialog.message(); void dialog.accept(); });
 
   await page.setInputFiles('#file-load', {
     name: 'bogus.dungeon',
@@ -105,7 +105,7 @@ test('rejects a structurally hostile file at the boundary and stays editable (de
   const markersBefore = await page.locator('#dm-map .mk').count();
 
   let alerted = '';
-  page.once('dialog', (dialog) => { alerted = dialog.message(); dialog.accept(); });
+  page.once('dialog', (dialog) => { alerted = dialog.message(); void dialog.accept(); });
 
   await page.setInputFiles('#file-load', {
     name: 'hostile.dungeon',
@@ -119,8 +119,8 @@ test('rejects a structurally hostile file at the boundary and stays editable (de
   await expect(page.locator('#dm-map .mk')).toHaveCount(markersBefore);
 
   const point = await page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
-    const rect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const rect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const svgBox = svg.getBoundingClientRect();
     const viewBox = svg.viewBox.baseVal;
     const scaleX = svgBox.width / viewBox.width;

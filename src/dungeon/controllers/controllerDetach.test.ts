@@ -42,6 +42,7 @@ describe('contextMenuController detach()', () => {
   function openMenuSomewhere(stack: Stack, open: (gridX: number, gridY: number, clientX: number, clientY: number) => void): HTMLElement | null {
     const dungeon = stack.getDungeon()!;
     const room = dungeon.rooms[0];
+    if (!room) throw new Error('fixture is expected to have at least one room');
     open(room.x, room.y, 50, 50);
     return document.querySelector<HTMLElement>('.cell-menu');
   }

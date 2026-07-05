@@ -50,8 +50,13 @@ test('launches sandboxed with no privileged renderer surface', async () => {
      --no-sandbox globally; outside the harness (npm run dev-electron) the
      sandbox is genuinely active. */
   const windowWebPreferences = await electronApp.evaluate(({ BrowserWindow }) => {
-    const { sandbox, contextIsolation, nodeIntegration } =
-      BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
+    const firstWindow = BrowserWindow.getAllWindows()[0];
+    if (!firstWindow) throw new Error('no Electron window');
+    // Electron's bundled types omit getLastWebPreferences, but it exists at runtime.
+    const webContents = firstWindow.webContents as unknown as {
+      getLastWebPreferences(): { sandbox?: boolean; contextIsolation?: boolean; nodeIntegration?: boolean } | null;
+    };
+    const { sandbox, contextIsolation, nodeIntegration } = webContents.getLastWebPreferences() ?? {};
     return { sandbox, contextIsolation, nodeIntegration };
   });
   expect(windowWebPreferences).toEqual({

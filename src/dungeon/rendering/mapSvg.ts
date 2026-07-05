@@ -18,7 +18,7 @@ export function buildSVG(dungeon: Dungeon, options: RenderOptions): string {
   const secretFloor: FloorGrid | null = options.secret && dungeon.secretFloor ? dungeon.secretFloor : null;
 
   function isEffectiveFloor(x: number, y: number): boolean {
-    return x >= 0 && y >= 0 && x < gridWidth && y < gridHeight && (base[y][x] === 1 || (!!secretFloor && secretFloor[y][x] === 1));
+    return x >= 0 && y >= 0 && x < gridWidth && y < gridHeight && (base[y]?.[x] === 1 || (!!secretFloor && secretFloor[y]?.[x] === 1));
   }
 
   const width = gridWidth * cell;
@@ -30,12 +30,12 @@ export function buildSVG(dungeon: Dungeon, options: RenderOptions): string {
   // floor + grid (base, on both maps)
   let rects = '';
   for (let fy = 0; fy < gridHeight; fy++) for (let fx = 0; fx < gridWidth; fx++) {
-    if (base[fy][fx] === 1) rects += '<rect x="' + (fx * cell) + '" y="' + (fy * cell) + '" width="' + cell + '" height="' + cell + '" fill="' + FLOOR + '" stroke="' + GRID + '" stroke-width="0.5"/>';
+    if (base[fy]?.[fx] === 1) rects += '<rect x="' + (fx * cell) + '" y="' + (fy * cell) + '" width="' + cell + '" height="' + cell + '" fill="' + FLOOR + '" stroke="' + GRID + '" stroke-width="0.5"/>';
   }
   // secret floor (DM only) — faint gold tint
   if (secretFloor) {
     for (let gridY = 0; gridY < gridHeight; gridY++) for (let gridX = 0; gridX < gridWidth; gridX++) {
-      if (secretFloor[gridY][gridX] === 1 && base[gridY][gridX] !== 1)
+      if (secretFloor[gridY]?.[gridX] === 1 && base[gridY]?.[gridX] !== 1)
         rects += '<rect x="' + (gridX * cell) + '" y="' + (gridY * cell) + '" width="' + cell + '" height="' + cell + '" fill="' + SECRET_FILL + '" stroke="' + GRID + '" stroke-width="0.5"/>';
     }
   }

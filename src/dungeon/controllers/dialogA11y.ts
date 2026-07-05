@@ -35,6 +35,7 @@ export function trapFocus(panel: HTMLElement): () => void {
     if (!tabbables.length) { event.preventDefault(); return; }
     const first = tabbables[0];
     const last = tabbables[tabbables.length - 1];
+    if (!first || !last) { event.preventDefault(); return; } // tabbables is non-empty here
     const active = document.activeElement;
     if (event.shiftKey) {
       if (active === first || !panel.contains(active)) { event.preventDefault(); last.focus(); }
@@ -111,7 +112,7 @@ export function applyMenuSemantics(menu: HTMLElement, onClose: () => void): Menu
 
   function focusItem(index: number): void {
     const wrapped = (index + items.length) % items.length;
-    items[wrapped].focus();
+    items[wrapped]?.focus();
   }
   menu.addEventListener('keydown', (event) => {
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -123,7 +124,7 @@ export function applyMenuSemantics(menu: HTMLElement, onClose: () => void): Menu
       case 'Escape': event.preventDefault(); event.stopPropagation(); onClose(); break;
     }
   });
-  if (items.length) items[0].focus();
+  items[0]?.focus();
 
   return {
     restoreFocus: () => { if (opener instanceof HTMLElement && opener.isConnected) opener.focus(); },

@@ -85,7 +85,8 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
   // ---- live-region status (shares #mode-hint with the structure controller) ----
   function describeCell(dungeon: Dungeon, position: CellPosition): string {
     const markerIndex = markerAtCell(dungeon, position.x, position.y);
-    if (markerIndex >= 0) return dungeon.markers[markerIndex].type + ' marker';
+    const marker = markerIndex >= 0 ? dungeon.markers[markerIndex] : undefined;
+    if (marker) return marker.type + ' marker';
     if (roomIndexAt(dungeon, position.x, position.y) >= 0) return 'room';
     if (isCorridorCell(dungeon, position.x, position.y)) return 'corridor';
     if (isBaseFloor(dungeon, position.x, position.y)) return 'floor';

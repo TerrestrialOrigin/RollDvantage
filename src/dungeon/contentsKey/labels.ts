@@ -21,7 +21,7 @@ export function typeLabel(type: string): string {
   const labels: Record<string, string> = {
     monster: 'Monster', boss: 'Boss', treasure: 'Treasure', trap: 'Trap', secret: 'Secret Passage', other: 'Other',
   };
-  return labels[type] || 'Mark';
+  return labels[type] ?? 'Mark';
 }
 
 /** The default label for an entry, before any user-supplied title. */

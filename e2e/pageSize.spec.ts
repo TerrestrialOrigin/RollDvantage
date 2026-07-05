@@ -15,11 +15,11 @@ const FIXTURE = resolve(here, 'fixtures/seed-c0ffee.dungeon');
 test.use({ viewport: { width: 1400, height: 2400 } });
 
 function mediaBox(pdf: Buffer): [number, number] | null {
-  const match = pdf.toString('latin1').match(/MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)/);
-  return match ? [Math.round(+match[1]), Math.round(+match[2])] : null;
+  const match = /MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)/.exec(pdf.toString('latin1'));
+  return match?.[1] !== undefined && match[2] !== undefined ? [Math.round(+match[1]), Math.round(+match[2])] : null;
 }
 function sheetCount(pdf: Buffer): number {
-  return (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  return (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
 }
 
 async function load(page: import('@playwright/test').Page): Promise<void> {

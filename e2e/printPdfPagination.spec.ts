@@ -28,7 +28,7 @@ test('printed PDF renders exactly one sheet per section', async ({ page }) => {
 
   const sectionCount = await page.locator('.page').count();
   const pdf = await page.pdf({ printBackground: false, preferCSSPageSize: true });
-  const sheetCount = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  const sheetCount = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
 
   expect(sheetCount).toBe(sectionCount);
 });

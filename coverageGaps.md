@@ -60,7 +60,7 @@ hostile-name case.
 - **Spec:** `chronicle-field-persistence` (created in `harden-domain-core-and-persistence`) + page scaling.
 - **Code:** `src/chronicle/pageScaling.ts`, `fieldPersistence.ts`, `chronicleToolbar.ts`.
 - **Covered:** ✅ `setupFieldPersistence` fully unit-tested (`fieldPersistence.test.ts`, added in `harden-domain-core-and-persistence`): type → namespaced save → restore on re-init → `clearAll`, plus throwing-storage tolerance and markup-neutralized restore.
-- **Remaining gap:** page scaling (`pageScaling.ts` `fit()` small-screen branch) stays E2E-only / untested — scheduled for the configs-and-test-gaps change.
+- **Covered (2026-07-04, `tighten-configs-and-close-test-gaps`):** ✅ `pageScaling.ts` `fit()` narrow-viewport branch is now unit-tested (`pageScaling.test.ts`) by overriding the `matchMedia` stub to `matches: true`; a mutation check (forcing `small = false`) confirms the test fails without the branch.
 
 ## Low priority
 
@@ -70,6 +70,16 @@ hostile-name case.
 - **Gap:** hard to assert headlessly (invokes `window.print()`); untested before and after the refactor.
 - **Add (optional):** an E2E that stubs `window.print`, clicks Export, and asserts the `pdf-bleed` class + `@page` style are applied then removed on `afterprint`.
 
-### 8. Lint the e2e specs
-- `eslint.config.js` currently ignores `e2e/` and `playwright.config.ts` (they are outside the typed `tsconfig` projects).
-- **Add (optional):** a dedicated `tsconfig.e2e.json` and an eslint override so the Playwright specs are type-checked/linted too.
+### 8. Lint the e2e specs ✅ DONE (2026-07-04, `tighten-configs-and-close-test-gaps`)
+- `eslint.config.js` no longer ignores `e2e/` or `playwright.config.ts`; a dedicated `tsconfig.e2e.json` (extending `tsconfig.app.json`, so the specs get the same strictness incl. `noUncheckedIndexedAccess`) was added to the ESLint type-aware `parserOptions.project`. The Playwright specs are now type-checked and linted under the re-enabled `no-floating-promises` / `no-explicit-any` rules.
+
+## Coverage baseline (2026-07-04, `tighten-configs-and-close-test-gaps`)
+
+A vitest v8 coverage threshold now guards against regression (configured in `vite.config.ts`). Measured unit coverage at introduction (much UI/controller glue is covered by the Playwright E2E suite, which this number does not see):
+
+| Metric | Measured | Threshold floor |
+|---|---|---|
+| Statements | 51.29% | 50% |
+| Branches | 46.91% | 45% |
+| Functions | 53.52% | 52% |
+| Lines | 55.46% | 54% |

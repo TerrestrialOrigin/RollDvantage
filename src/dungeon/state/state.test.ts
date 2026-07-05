@@ -47,6 +47,43 @@ describe('History', () => {
   });
 });
 
+describe('History change listener (M9)', () => {
+  it('fires the constructor onChange on record, undo, and redo', () => {
+    let calls = 0;
+    const h = new History({ onChange: () => { calls++; } });
+    h.record(dungeon('a')); h.record(dungeon('b')); // 2 records
+    expect(calls).toBe(2);
+    h.undo(); // 1 undo
+    expect(calls).toBe(3);
+    h.redo(); // 1 redo
+    expect(calls).toBe(4);
+  });
+
+  it('does not fire onChange when undo/redo are no-ops at the stack ends', () => {
+    let calls = 0;
+    const h = new History({ onChange: () => { calls++; } });
+    h.record(dungeon('a')); // calls = 1
+    expect(h.undo()).toBeNull();  // at the floor: no move
+    expect(h.redo()).toBeNull();  // at the ceiling: no move
+    expect(calls).toBe(1);        // neither no-op fired the listener
+  });
+
+  it('is a safe no-op when no listener is set', () => {
+    const h = new History(); // no onChange
+    expect(() => { h.record(dungeon('a')); h.record(dungeon('b')); h.undo(); h.redo(); }).not.toThrow();
+  });
+
+  it('setChangeListener rewires the listener', () => {
+    let first = 0, second = 0;
+    const h = new History({ onChange: () => { first++; } });
+    h.record(dungeon('a')); // first = 1
+    h.setChangeListener(() => { second++; });
+    h.record(dungeon('b')); // second = 1, first unchanged
+    expect(first).toBe(1);
+    expect(second).toBe(1);
+  });
+});
+
 describe('DungeonStore level', () => {
   it('clamps to 1..6', () => {
     expect(clampLevel(0)).toBe(1);

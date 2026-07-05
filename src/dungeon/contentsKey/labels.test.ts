@@ -29,7 +29,7 @@ describe('contents-key labels', () => {
     } as unknown as Dungeon;
     const entries = relabel(dungeon);
     expect(entries.map((e) => e.feature.ref)).toEqual(['A', 'B']);
-    expect(entries[0].feature.note).toBe('a'); // seq 1 sorts first
+    expect(entries[0]?.feature.note).toBe('a'); // seq 1 sorts first
     expect(dungeon._seq).toBe(3);
   });
 

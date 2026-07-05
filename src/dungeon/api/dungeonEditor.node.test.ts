@@ -68,9 +68,14 @@ describe('DungeonEditor runs headless (no DOM)', () => {
     // The documented legacy shape: L-schema secretPaths (ax/ay/bx/by/horizFirst).
     const gridWidth = 6, gridHeight = 5;
     const floor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
-    floor[1][1] = floor[1][2] = floor[2][1] = floor[2][2] = 1;
+    const floorRowOne = floor[1];
+    const floorRowTwo = floor[2];
+    if (floorRowOne && floorRowTwo) {
+      floorRowOne[1] = floorRowOne[2] = floorRowTwo[1] = floorRowTwo[2] = 1;
+    }
     const secretFloor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
-    secretFloor[3][1] = secretFloor[3][2] = secretFloor[3][3] = 1;
+    const secretRowThree = secretFloor[3];
+    if (secretRowThree) secretRowThree[1] = secretRowThree[2] = secretRowThree[3] = 1;
     const legacyJson = JSON.stringify({
       seed: 123, name: 'Old Keep', depth: 'Depth 2', level: 2,
       grid: { gw: gridWidth, gh: gridHeight, cell: 24 },
@@ -91,10 +96,28 @@ describe('DungeonEditor runs headless (no DOM)', () => {
     editor.unmakeSecret(2, 3);
     const after = editor.getState().dungeon!;
     expect(after.secretPaths).toHaveLength(0);
-    expect(after.floor[3][2]).toBe(1); // passage back on the visible floor
+    expect(after.floor[3]?.[2]).toBe(1); // passage back on the visible floor
   });
 
   it('rejects structurally hostile JSON at the boundary', () => {
     expect(() => parseDungeonText('{"grid":{"gw":2,"gh":1,"cell":24},"floor":"x","markers":{},"seed":1}')).toThrow();
+  });
+});
+
+describe('DungeonEditor out-of-range marker guards (M9)', () => {
+  it('moveMarker/deleteMarker/retypeMarker on an out-of-range index are safe no-ops', () => {
+    const { editor } = makeEditor();
+    editor.generate('detailed');
+    const before = JSON.stringify(editor.getState().dungeon!.markers);
+    const outOfRange = editor.getState().dungeon!.markers.length + 50;
+
+    // Each guard (if (!marker) return / if (markers[index])) means these must
+    // neither throw nor mutate. Removing a guard turns these into a crash.
+    expect(() => editor.moveMarker(outOfRange, 3, 3)).not.toThrow();
+    expect(() => editor.retypeMarker(outOfRange, 'boss')).not.toThrow();
+    expect(() => editor.deleteMarker(outOfRange)).not.toThrow();
+    expect(() => editor.deleteMarker(-1)).not.toThrow();
+
+    expect(JSON.stringify(editor.getState().dungeon!.markers)).toBe(before); // unchanged
   });
 });

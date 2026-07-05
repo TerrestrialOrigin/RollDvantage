@@ -54,6 +54,7 @@ export class History {
   }
 
   private peek(): Dungeon | null {
-    return this.index < 0 ? null : (JSON.parse(this.snapshots[this.index]) as Dungeon);
+    const snapshot = this.snapshots[this.index];
+    return snapshot === undefined ? null : (JSON.parse(snapshot) as Dungeon);
   }
 }

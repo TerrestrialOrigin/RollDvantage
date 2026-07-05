@@ -41,7 +41,8 @@ test('every section after the first forces a page break so no two share a sheet'
     const pages = Array.from(document.querySelectorAll<HTMLElement>('.page'));
     return pages.map((element, index) => {
       const style = getComputedStyle(element);
-      const previous = index > 0 ? getComputedStyle(pages[index - 1]) : null;
+      const previousElement = pages[index - 1];
+      const previous = previousElement ? getComputedStyle(previousElement) : null;
       const forcedBefore = style.breakBefore === 'page' || style.pageBreakBefore === 'always';
       const previousForcedAfter =
         previous !== null && (previous.breakAfter === 'page' || previous.pageBreakAfter === 'always');

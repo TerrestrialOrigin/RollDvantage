@@ -33,9 +33,14 @@ function minimalDungeon(): Record<string, unknown> {
 function legacyDungeon(): Record<string, unknown> {
   const gridWidth = 6, gridHeight = 5;
   const floor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
-  floor[1][1] = floor[1][2] = floor[2][1] = floor[2][2] = 1; // one visible room
+  const floorRowOne = floor[1];
+  const floorRowTwo = floor[2];
+  if (floorRowOne && floorRowTwo) {
+    floorRowOne[1] = floorRowOne[2] = floorRowTwo[1] = floorRowTwo[2] = 1; // one visible room
+  }
   const secretFloor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
-  secretFloor[3][1] = secretFloor[3][2] = secretFloor[3][3] = 1; // a secret run
+  const secretRowThree = secretFloor[3];
+  if (secretRowThree) secretRowThree[1] = secretRowThree[2] = secretRowThree[3] = 1; // a secret run
   return {
     seed: 123,
     name: 'Old Keep',
