@@ -180,3 +180,17 @@ test('web build carries no Electron CSP meta tag', async ({ page }) => {
     .count();
   expect(cspMetaCount).toBe(0);
 });
+
+test('license link opens the license page and the back link returns to the editor', async ({ page }) => {
+  /* The "Back to Generator" link previously pointed at a nonexistent file
+     (Auto-Dungeon Generator.html) and 404'd. It must round-trip the user from
+     the editor to the license and back. */
+  await page.click('.bm-link');
+  await expect(page).toHaveURL(/License\.html$/);
+  await page.waitForSelector('.doc-frame');
+
+  await page.click('.lic-back');
+  await expect(page).toHaveURL(/\/index\.html$/);
+  await page.waitForSelector('#dm-map svg');
+  await expect(page.locator('#dm-map svg.dmap')).toBeVisible();
+});
