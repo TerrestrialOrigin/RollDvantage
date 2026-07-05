@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 /* ============================================================
    ELECTRON SHELL SECURITY SMOKE — real Electron build, no mocks.
@@ -130,6 +131,40 @@ test('ships a CSP that forbids inline script and inline style', async () => {
   expect(toolbarToggles).toBe(true);
 });
 
+test('opens the styled Terms & License page and returns to the editor', async () => {
+  /* Desktop users must be able to reach, read (styled), and leave the license.
+     Before this change the nav guard swallowed the same-tab link to
+     License.html, and the CSP blocked its inline <style> so it rendered
+     unstyled. Clicking the link must now load the fully-styled page. */
+  await appWindow.click('.bm-link');
+  await appWindow.waitForSelector('.doc-frame');
+  await expect(appWindow.locator('.lic-title')).toHaveText('RollDvantage');
+
+  /* The page renders styled, and that styling comes from the extracted,
+     bundled license stylesheet — `.lic-back { position: fixed }` and
+     `.lic-sec p { font-size: 18px }` exist only in src/styles/license.css.
+     If style-src had blocked it (inline <style> under CSP), both would fall
+     back to their unstyled defaults. And the page ships no inline <style>. */
+  const licensePresentation = await appWindow.evaluate(() => {
+    const backLink = document.querySelector('.lic-back');
+    const sectionParagraph = document.querySelector('.lic-sec p');
+    return {
+      backLinkPosition: backLink ? getComputedStyle(backLink).position : '',
+      sectionParagraphFontSize: sectionParagraph ? getComputedStyle(sectionParagraph).fontSize : '',
+      inlineStyleBlocks: document.querySelectorAll('style').length,
+    };
+  });
+  expect(licensePresentation.backLinkPosition).toBe('fixed');
+  expect(licensePresentation.sectionParagraphFontSize).toBe('18px');
+  expect(licensePresentation.inlineStyleBlocks).toBe(0);
+
+  /* The "Back to Generator" link returns to the editor (it pointed at a
+     nonexistent file before this change). */
+  await appWindow.click('.lic-back');
+  await appWindow.waitForSelector('#dm-map svg.dmap');
+  await expect(appWindow.locator('#dm-map svg.dmap')).toBeVisible();
+});
+
 test('New → Save → Load round-trip works inside the sandboxed shell', async () => {
   await appWindow.click('#btn-new');
   await appWindow.getByRole('menuitem', { name: 'Map only' }).click();
@@ -188,6 +223,23 @@ test('blocks navigation to an external origin (denial case)', async () => {
   /* Editor state is intact: the rendered dungeon is still there. Asserted via
      evaluate — locators would wait forever on the prevented (never-committing)
      navigation Playwright still considers in flight. */
+  const dungeonStillRendered = await appWindow.evaluate(
+    () => document.querySelector('#dm-map svg.dmap') !== null,
+  );
+  expect(dungeonStillRendered).toBe(true);
+});
+
+test('blocks navigation to a file outside the app directory (denial case)', async () => {
+  /* The guard now allows the app's OWN bundled pages (License.html) but must
+     still block any file:// URL outside the install directory — the classic
+     containment bypass. A sibling/temp file must not be loadable. */
+  const urlBefore = appWindow.url();
+  const outsideFileUrl = pathToFileURL(join(tmpdir(), 'not-the-app.html')).href;
+  await appWindow.evaluate((target) => {
+    window.location.href = target;
+  }, outsideFileUrl);
+  await appWindow.waitForTimeout(1000);
+  expect(appWindow.url()).toBe(urlBefore);
   const dungeonStillRendered = await appWindow.evaluate(
     () => document.querySelector('#dm-map svg.dmap') !== null,
   );

@@ -9,138 +9,14 @@
      fixes the previously-broken relative chronicle.css reference. -->
 <link rel="stylesheet" href="./src/styles/fonts.css" />
 <link rel="stylesheet" href="./src/styles/chronicle.css" />
-<style>
-  body{ padding:46px 16px 90px; }
-
-  /* one flowing parchment leaf, sized for reading + clean print */
-  .doc{
-    position:relative; width:min(7.6in, 100%); margin:0 auto;
-    background:var(--parch);
-    box-shadow:0 26px 60px -18px rgba(0,0,0,.7), 0 2px 0 rgba(0,0,0,.4);
-  }
-  .doc-frame{
-    position:relative;
-    border:1px solid oklch(0.7 0.04 76 / .55);
-    box-shadow:inset 0 0 0 3px oklch(0.78 0.04 80 / .25);
-    margin:0.42in; padding:0.7in 0.72in 0.62in;
-  }
-
-  /* masthead */
-  .lic-head{ text-align:center; margin-bottom:8px; }
-  .lic-over{
-    font-family:var(--font-struct); font-weight:500;
-    letter-spacing:.4em; text-transform:uppercase; font-size:11px;
-    color:var(--gold-deep); padding-left:.4em;
-  }
-  .lic-title{
-    font-family:var(--font-display); font-weight:900;
-    font-size:54px; line-height:1.02; margin:14px 0 0;
-    color:transparent;
-    background:linear-gradient(180deg, var(--gold-bright), var(--gold) 55%, var(--gold-deep));
-    -webkit-background-clip:text; background-clip:text;
-    letter-spacing:.01em;
-  }
-  .lic-kicker{
-    font-style:italic; font-size:19px; color:var(--ink-soft); margin:12px 0 0;
-  }
-  .lic-meta{
-    font-family:var(--font-struct); font-size:10px; letter-spacing:.22em;
-    text-transform:uppercase; color:var(--gold-deep); margin:16px 0 0;
-  }
-  .lic-meta .dot{ color:var(--ink-soft); margin:0 .7em; }
-
-  /* sections */
-  .lic-sec{ margin-top:30px; }
-  .lic-sec:first-of-type{ margin-top:24px; }
-  .lic-sec h3{
-    display:flex; align-items:baseline; gap:.6em;
-    font-family:var(--font-struct); font-weight:600;
-    font-size:17px; letter-spacing:.1em; text-transform:uppercase;
-    color:var(--ink); margin:0 0 11px;
-  }
-  .lic-sec h3 .num{
-    font-family:var(--font-display); font-weight:700; font-size:20px;
-    color:var(--gold-deep); flex:none; line-height:1;
-  }
-  .lic-sec p{
-    font-family:var(--font-body); font-size:18px; line-height:1.5;
-    color:var(--ink); margin:0 0 11px; text-wrap:pretty;
-  }
-  .lic-sec p:last-child{ margin-bottom:0; }
-  .lic-sec strong{ font-weight:600; color:var(--ink); }
-
-  .lic-list{
-    list-style:none; margin:4px 0 11px; padding:0;
-  }
-  .lic-list li{
-    position:relative; font-family:var(--font-body); font-size:18px;
-    line-height:1.46; color:var(--ink); padding-left:1.5em; margin:0 0 8px;
-    text-wrap:pretty;
-  }
-  .lic-list li::before{
-    content:""; position:absolute; left:.35em; top:.62em;
-    width:6px; height:6px; background:var(--gold-deep); transform:rotate(45deg);
-  }
-  .lic-list li strong{ font-weight:600; }
-
-  /* pull-aside note (the "narrow exception") */
-  .lic-aside{
-    border-left:2px solid var(--gold-deep);
-    background:oklch(0.93 0.02 82 / .55);
-    padding:14px 18px; margin:14px 0 0;
-  }
-  .lic-aside p{ font-style:italic; font-size:17.5px; color:var(--ink-soft); margin:0; }
-  .lic-aside strong{ font-style:normal; color:var(--ink); }
-
-  /* dividers */
-  .lic-divider{ display:flex; align-items:center; justify-content:center; gap:11px; margin:34px 0 0; }
-  .lic-divider .ln{ height:1px; width:110px; background:linear-gradient(90deg, transparent, var(--gold-deep)); }
-  .lic-divider .ln.rev{ background:linear-gradient(90deg, var(--gold-deep), transparent); }
-  .lic-divider .dot{ width:6px; height:6px; background:var(--gold-deep); transform:rotate(45deg); }
-
-  /* colophon */
-  .lic-foot{
-    text-align:center; margin-top:34px;
-    font-family:var(--font-struct); font-size:11px; letter-spacing:.18em;
-    text-transform:uppercase; color:var(--gold-deep); line-height:1.7;
-  }
-
-  /* back link (screen only) */
-  .lic-back{
-    position:fixed; top:20px; left:22px; z-index:50;
-    display:inline-flex; align-items:center; gap:.5em;
-    font-family:var(--font-struct); font-size:11px; letter-spacing:.16em;
-    text-transform:uppercase; text-decoration:none;
-    color:oklch(0.86 0.03 82);
-    background:oklch(0.18 0.014 64 / .92); backdrop-filter:blur(8px);
-    border:1px solid oklch(0.5 0.06 74 / .6); border-radius:999px;
-    padding:9px 17px; box-shadow:0 14px 30px -10px rgba(0,0,0,.7);
-    transition:.18s;
-  }
-  .lic-back:hover{ background:oklch(0.3 0.04 72); color:var(--gold-bright); }
-  .lic-back .arr{ font-size:14px; line-height:1; transform:translateY(-1px); }
-
-  @media (max-width:700px){
-    .doc-frame{ margin:0; border:none; box-shadow:none; padding:30px 18px 26px; }
-    .doc{ box-shadow:none; }
-    .lic-title{ font-size:38px; }
-    .lic-back{ top:12px; left:12px; }
-  }
-
-  @media print{
-    @page{ size:Letter; margin:0.7in; }
-    body{ background:none; padding:0; }
-    .doc{ width:100%; box-shadow:none; background:none; }
-    .doc-frame{ margin:0; border:none; box-shadow:none; padding:0; }
-    .lic-back{ display:none !important; }
-    .lic-sec{ break-inside:avoid; }
-    .lic-title{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  }
-</style>
+<!-- Page-specific styling extracted from a former inline style block into a
+     bundled stylesheet so this page renders under the Electron CSP (style-src
+     'self') with no inline style. -->
+<link rel="stylesheet" href="./src/styles/license.css" />
 </head>
 <body>
 
-<a class="lic-back" href="Auto-Dungeon Generator.html"><span class="arr">&#8592;</span> Back to Generator</a>
+<a class="lic-back" href="./index.html"><span class="arr">&#8592;</span> Back to Generator</a>
 
 <div class="doc">
   <div class="doc-frame">

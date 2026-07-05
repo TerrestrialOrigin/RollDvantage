@@ -1,12 +1,34 @@
 import { app, BrowserWindow } from 'electron';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isAbsolute, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const WINDOW_WIDTH_DEFAULT = 800;
 const WINDOW_HEIGHT_DEFAULT = 600;
 const ENTRY_POINT = './index.html';
 
-const appEntryUrl = () => pathToFileURL(join(import.meta.dirname, ENTRY_POINT)).href;
+/* The app's own install directory. Navigation is allowed only for the app's
+   own bundled pages, resolved by containment against this root. */
+const APP_ROOT = import.meta.dirname;
+
+/* A navigation target is permitted only when it is a file:// URL whose
+   normalized path is contained within the app directory. Every non-file scheme
+   (e.g. https:) and any file:// URL outside the app directory is rejected.
+   Containment is checked with path.relative — never a string prefix, which
+   would let a sibling like `<app>-evil/` slip through — and a URL that fails to
+   parse or convert is treated as "outside" (fail-closed). Query and hash are
+   dropped by fileURLToPath, which reads only the path. */
+const isWithinApp = (targetUrl: string): boolean => {
+	let targetPath: string;
+	try {
+		const parsed = new URL(targetUrl);
+		if (parsed.protocol !== 'file:') return false;
+		targetPath = fileURLToPath(parsed);
+	} catch {
+		return false;
+	}
+	const relativePath = relative(APP_ROOT, targetPath);
+	return relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath);
+};
 
 /* The renderer needs no privileged API (save/load uses browser file mechanics),
    so the window runs fully sandboxed with no preload. See the change's ThreatModel.md. */
@@ -22,7 +44,7 @@ const denyWindowOpen = (window: BrowserWindow) => {
 
 const blockExternalNavigation = (window: BrowserWindow) => {
 	window.webContents.on('will-navigate', (event, targetUrl) => {
-		if (targetUrl !== appEntryUrl()) {
+		if (!isWithinApp(targetUrl)) {
 			event.preventDefault();
 		}
 	});
