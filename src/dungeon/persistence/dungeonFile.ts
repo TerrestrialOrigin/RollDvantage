@@ -52,25 +52,50 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value);
+}
+
+/** An integer cell coordinate inside the grid rectangle `[0, columns) × [0, rows)`. */
+function isCellInBounds(x: unknown, y: unknown, columns: number, rows: number): boolean {
+  return isInteger(x) && isInteger(y) && x >= 0 && x < columns && y >= 0 && y < rows;
+}
+
 /** A rows×columns matrix of numbers (the floor / secretFloor occupancy grids). */
 function isNumberMatrix(value: unknown, rows: number, columns: number): boolean {
   if (!Array.isArray(value) || value.length !== rows) return false;
   return value.every((row) => Array.isArray(row) && row.length === columns && row.every((cell) => isFiniteNumber(cell)));
 }
 
-function isValidRoom(value: unknown): boolean {
-  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.w) && isFiniteNumber(value.h);
+/** A room/secret-room rectangle: integer origin and dimensions that stay inside
+    the grid rectangle (`x + w ≤ columns`, `y + h ≤ rows`). Optional `cx`/`cy`
+    centre cells, when present, must be integer cells in bounds. */
+function isValidRoom(value: unknown, columns: number, rows: number): boolean {
+  if (!isRecord(value)) return false;
+  if (!isInteger(value.x) || !isInteger(value.y) || !isInteger(value.w) || !isInteger(value.h)) return false;
+  if (value.x < 0 || value.y < 0 || value.w < 0 || value.h < 0) return false;
+  if (value.x + value.w > columns || value.y + value.h > rows) return false;
+  if (value.cx != null && !isCellInBounds(value.cx, value.y, columns, rows)) return false;
+  if (value.cy != null && !isCellInBounds(value.x, value.cy, columns, rows)) return false;
+  return true;
 }
 
-function isValidMarker(value: unknown): boolean {
-  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && typeof value.type === 'string';
+function isValidMarker(value: unknown, columns: number, rows: number): boolean {
+  return isRecord(value) && typeof value.type === 'string' && isCellInBounds(value.x, value.y, columns, rows);
 }
 
 function isValidCorridorNote(value: unknown): boolean {
   return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y);
 }
 
-function isModernSecretPath(value: unknown): value is SecretPath {
+/** Modern secret-path endpoints are integer cells inside the grid rectangle. */
+function isModernSecretPath(value: unknown, columns: number, rows: number): value is SecretPath {
+  return isRecord(value) && isCellInBounds(value.x1, value.y1, columns, rows) && isCellInBounds(value.x2, value.y2, columns, rows);
+}
+
+/** Type guard for migration only — no bounds (legacy L-paths are normalized at
+    load and never re-emitted; endpoints are checked finite, not in-bounds). */
+function looksLikeModernSecretPath(value: unknown): value is SecretPath {
   return isRecord(value) && isFiniteNumber(value.x1) && isFiniteNumber(value.y1) && isFiniteNumber(value.x2) && isFiniteNumber(value.y2);
 }
 
@@ -78,9 +103,18 @@ function isLegacySecretPath(value: unknown): value is LegacySecretPath {
   return isRecord(value) && isFiniteNumber(value.ax) && isFiniteNumber(value.ay) && isFiniteNumber(value.bx) && isFiniteNumber(value.by);
 }
 
-/** Secret paths validate in either schema; `migrateDungeon` normalizes afterwards. */
-function isValidSecretPath(value: unknown): boolean {
-  return isModernSecretPath(value) || isLegacySecretPath(value);
+/** Secret paths validate in either schema; `migrateDungeon` normalizes afterwards.
+    Modern endpoints must be in-bounds integer cells; legacy L-paths keep a
+    finite-only check (they are migrated immediately at load). */
+function isValidSecretPath(value: unknown, columns: number, rows: number): boolean {
+  return isModernSecretPath(value, columns, rows) || isLegacySecretPath(value);
+}
+
+/** The five dungeon feature counts every render path dereferences. */
+function isValidTally(value: unknown): boolean {
+  return isRecord(value)
+    && isFiniteNumber(value.rooms) && isFiniteNumber(value.foes) && isFiniteNumber(value.traps)
+    && isFiniteNumber(value.loot) && isFiniteNumber(value.secret);
 }
 
 function isArrayOf(value: unknown, itemCheck: (item: unknown) => boolean): boolean {
@@ -96,8 +130,8 @@ function hasValidGrid(candidate: Record<string, unknown>): candidate is Record<s
     generator's empty mode emit) or valid; presence with the wrong shape rejects. */
 function hasValidOptionalFields(candidate: Record<string, unknown>, rows: number, columns: number): boolean {
   if (candidate.secretFloor != null && !isNumberMatrix(candidate.secretFloor, rows, columns)) return false;
-  if (candidate.secretRooms != null && !isArrayOf(candidate.secretRooms, isValidRoom)) return false;
-  if (candidate.secretPaths != null && !isArrayOf(candidate.secretPaths, isValidSecretPath)) return false;
+  if (candidate.secretRooms != null && !isArrayOf(candidate.secretRooms, (room) => isValidRoom(room, columns, rows))) return false;
+  if (candidate.secretPaths != null && !isArrayOf(candidate.secretPaths, (path) => isValidSecretPath(path, columns, rows))) return false;
   if (candidate.corridorNotes != null && !isArrayOf(candidate.corridorNotes, isValidCorridorNote)) return false;
   return true;
 }
@@ -111,11 +145,13 @@ function hasValidOptionalFields(candidate: Record<string, unknown>, rows: number
 export function isValidDungeon(value: unknown): value is ExternalDungeon {
   if (!isRecord(value)) return false;
   if (!isFiniteNumber(value.seed)) return false;
+  if (typeof value.name !== 'string' || typeof value.depth !== 'string') return false;
+  if (!isValidTally(value.tally)) return false;
   if (!hasValidGrid(value)) return false;
   const { gw: columns, gh: rows } = value.grid;
   if (!isNumberMatrix(value.floor, rows, columns)) return false;
-  if (!isArrayOf(value.rooms, isValidRoom)) return false;
-  if (!isArrayOf(value.markers, isValidMarker)) return false;
+  if (!isArrayOf(value.rooms, (room) => isValidRoom(room, columns, rows))) return false;
+  if (!isArrayOf(value.markers, (marker) => isValidMarker(marker, columns, rows))) return false;
   return hasValidOptionalFields(value, rows, columns);
 }
 
@@ -143,7 +179,7 @@ export function migrateDungeon(raw: ExternalDungeon): Dungeon {
   const rawPaths = (raw.secretPaths ?? []) as unknown[];
   if (rawPaths.length > 0) {
     raw.secretPaths = rawPaths.flatMap((path) =>
-      isModernSecretPath(path) ? [path] : legacyPathToSegments(path as LegacySecretPath));
+      looksLikeModernSecretPath(path) ? [path] : legacyPathToSegments(path as LegacySecretPath));
   }
   raw.version = DUNGEON_SCHEMA_VERSION;
   const dungeon = raw as unknown as Dungeon;
