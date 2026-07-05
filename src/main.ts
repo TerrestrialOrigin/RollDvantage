@@ -1,3 +1,7 @@
+/* fonts.css first: it registers the self-hosted @font-face declarations the
+   other stylesheets reference via var(--font-*). Placement is order-independent
+   for @font-face correctness, but front-loading keeps the intent clear. */
+import './styles/fonts.css';
 /* dungeon.css must precede chronicle.css: it replaced the inline <style> block
    that the bundled stylesheet historically followed, so chronicle.css keeps
    winning equal-specificity ties (e.g. `.toolbar` positioning). */

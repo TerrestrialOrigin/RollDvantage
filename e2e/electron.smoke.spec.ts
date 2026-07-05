@@ -84,6 +84,14 @@ test('ships a CSP that forbids inline script and inline style', async () => {
   expect(styleSrcDirective).toBeDefined();
   expect(styleSrcDirective).not.toContain("'unsafe-inline'");
 
+  /* Fonts are self-hosted (self-host-fonts change): style-src and font-src are
+     'self' only, and no Google Fonts origin appears anywhere in the policy. */
+  expect(styleSrcDirective).toBe("style-src 'self'");
+  const fontSrcDirective = directiveNamed('font-src');
+  expect(fontSrcDirective).toBe("font-src 'self'");
+  expect(cspContent).not.toContain('fonts.googleapis.com');
+  expect(cspContent).not.toContain('fonts.gstatic.com');
+
   /* No inline <style>/<script> ships anymore — all app CSS and the hamburger
      logic moved into the bundle (Change 8). */
   const inlineSurfaces = await appWindow.evaluate(() => ({

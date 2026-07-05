@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import { configDefaults } from 'vitest/config'
 import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
 
 const isElectron = process.env.BUILD_TARGET === 'electron';
 
@@ -24,8 +25,10 @@ const buildCspContent = (html: string): string => {
   return [
     "default-src 'self'",
     `script-src ${scriptSources}`,
-    "style-src 'self' https://fonts.googleapis.com",
-    "font-src https://fonts.gstatic.com",
+    // Fonts are self-hosted (bundled woff2, see src/styles/fonts.css), so no
+    // remote style/font origin is whitelisted — do not reintroduce one.
+    "style-src 'self'",
+    "font-src 'self'",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "object-src 'none'",
@@ -62,6 +65,14 @@ export default defineConfig({
   plugins: isElectron ? [electronCspPlugin()] : [],
   build: {
     outDir: isElectron ? 'dist-electron' : 'dist',
+    rollupOptions: {
+      // Multi-page: the app entry plus the standalone Terms & License page, so
+      // both are processed by Vite and share the bundled, self-hosted fonts.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        license: resolve(__dirname, 'License.html'),
+      },
+    },
   },
   test: {
     globals: true,
