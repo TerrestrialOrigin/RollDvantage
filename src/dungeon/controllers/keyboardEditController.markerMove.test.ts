@@ -11,7 +11,7 @@ import { migrateDungeon } from '../persistence/dungeonFile';
 import { attachKeyboardEditController } from './keyboardEditController';
 import type { StructureModeHandles } from './structureModeController';
 import type { ControllerContext, ModeState } from './types';
-import type { Dungeon, ExternalDungeon } from '../model/types';
+import type { Dungeon, ExternalDungeon, Marker } from '../model/types';
 
 function memStore(): { getItem(key: string): string | null; setItem(key: string, value: string): void } {
   const data: Record<string, string> = {};
@@ -26,11 +26,11 @@ interface Stack {
   structureModes: StructureModeHandles;
 }
 
-function realStack(): Stack {
+function realStack(dungeon?: Dungeon): Stack {
   const history = new History();
   const store = new DungeonStore(history, memStore());
   const editor = createDungeonEditor(store, history);
-  editor.loadFromJson(migrateDungeon(
+  editor.loadFromJson(dungeon ?? migrateDungeon(
     JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'full'))) as ExternalDungeon));
   const modes: ModeState = { current: null, selectedMarkerType: null };
   const structureModes: StructureModeHandles = { setMode: vi.fn(), updateModeHint: vi.fn(), detach: vi.fn() };
@@ -66,9 +66,9 @@ function emptyCell(dungeon: Dungeon): { x: number; y: number } {
   throw new Error('no empty cell in fixture');
 }
 
-function setup(): Stack {
+function setup(dungeon?: Dungeon): Stack {
   document.body.innerHTML = '<div id="dm-map"><svg></svg></div><div id="mode-hint"></div>';
-  const stack = realStack();
+  const stack = realStack(dungeon);
   attachKeyboardEditController({ ...stack.context, openNoteAtCell: stack.openNoteAtCell, structureModes: stack.structureModes });
   return stack;
 }
@@ -216,5 +216,99 @@ describe('keyboard marker retype', () => {
     press('t');
 
     expect(retypeSpy).not.toHaveBeenCalled();
+  });
+});
+
+/* ---- Secret (S) badge: keyboard move/retype must preserve the invariant that
+   the badge's position IS the secret status of the floor beneath it (R1). The
+   pointer path already special-cases this; the keyboard path must reach parity.
+
+   These use a hand-built dungeon with two independent horizontal corridor runs
+   (no rooms, no pre-existing secrets), so the (S) badge and destination are
+   exact and deterministic. */
+function twoCorridorDungeon(): Dungeon {
+  const gridWidth = 6, gridHeight = 6;
+  const floor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
+  const runA = floor[1], runB = floor[4];                     // two separated runs
+  if (runA) runA[1] = runA[2] = runA[3] = 1;                  // run A: (1..3, 1)
+  if (runB) runB[1] = runB[2] = runB[3] = 1;                  // run B: (1..3, 4)
+  return {
+    seed: 1, name: 'Secret Test', depth: 'Depth 1',
+    grid: { width: gridWidth, height: gridHeight, cell: 24 },
+    floor, rooms: [], markers: [],
+    tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 0 },
+  };
+}
+
+/** The single (S) badge marker, or undefined. */
+function secretBadge(dungeon: Dungeon): Marker | undefined {
+  return dungeon.markers.find((marker) => marker.type === 'secret');
+}
+
+/** Make run A (row 1) secret and return the resulting (S) badge's cell. */
+function secretRunA(stack: Stack): { x: number; y: number } {
+  stack.editor.makeSecret(2, 1);                              // any cell of run A
+  const badge = secretBadge(stack.getDungeon());
+  if (!badge) throw new Error('makeSecret did not place an (S) badge');
+  return { x: badge.x, y: badge.y };
+}
+
+describe('keyboard secret (S) badge move', () => {
+  it('keyboard-moving the (S) badge to a convertible corridor moves the SECRET, not the raw badge', () => {
+    const stack = setup(twoCorridorDungeon());
+    const badge = secretRunA(stack);
+    const destination = { x: 2, y: 4 };                        // a cell of the still-visible run B
+
+    walkTo(stack.getDungeon(), badge.x, badge.y);
+    press('m');
+    walkTo(stack.getDungeon(), destination.x, destination.y);
+    press('Enter');
+
+    const dungeon = stack.getDungeon();
+    const badges = dungeon.markers.filter((marker) => marker.type === 'secret');
+    expect(badges).toHaveLength(1);                            // still exactly one badge (relocated, not duplicated)
+    const moved = badges[0]!;
+    // the badge sits on secret floor (its position IS the secret status) — broken today
+    expect(dungeon.secretFloor?.[moved.y]?.[moved.x]).toBe(1);
+    // run B became secret; run A returned to visible floor with no orphan badge
+    expect(dungeon.secretFloor?.[destination.y]?.[destination.x]).toBe(1);
+    expect(dungeon.floor[badge.y]?.[badge.x]).toBe(1);
+    expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(0);
+  });
+
+  it('keyboard-dropping the (S) badge on an already-secret cell leaves the secret untouched', () => {
+    const stack = setup(twoCorridorDungeon());
+    const badge = secretRunA(stack);
+    // another cell of run A — placeable (secret floor) but NOT convertible (already secret)
+    const alreadySecret = { x: badge.x === 1 ? 3 : 1, y: 1 };
+
+    walkTo(stack.getDungeon(), badge.x, badge.y);
+    press('m');
+    walkTo(stack.getDungeon(), alreadySecret.x, alreadySecret.y);
+    press('Enter');
+
+    const dungeon = stack.getDungeon();
+    const badges = dungeon.markers.filter((marker) => marker.type === 'secret');
+    expect(badges).toHaveLength(1);
+    // the badge did NOT relocate — it stays at its original midpoint (moved today)
+    expect({ x: badges[0]!.x, y: badges[0]!.y }).toEqual(badge);
+    expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(1);
+  });
+});
+
+describe('keyboard secret (S) badge retype', () => {
+  it('t on an (S) badge is a no-op — it is never cycled into a placeable type', () => {
+    const stack = setup(twoCorridorDungeon());
+    const badge = secretRunA(stack);
+    const retypeSpy = vi.spyOn(stack.editor, 'retypeMarker');
+
+    walkTo(stack.getDungeon(), badge.x, badge.y);
+    press('t');
+
+    expect(retypeSpy).not.toHaveBeenCalled();
+    const dungeon = stack.getDungeon();
+    const atBadge = dungeon.markers.find((marker) => marker.x === badge.x && marker.y === badge.y);
+    expect(atBadge?.type).toBe('secret');                      // still a secret badge (becomes 'boss' today)
+    expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(1); // secret floor intact
   });
 });
