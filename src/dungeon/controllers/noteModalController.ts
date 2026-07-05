@@ -41,7 +41,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     const annotations = relabel(dungeon);
     elementKind.contentEditable = 'true';                      // every title is editable
     elementKind.classList.add('editable');
-    elementKind.setAttribute('data-ph', rawLabel(dungeon, { o: target, kind }));   // placeholder = default label
+    elementKind.setAttribute('data-ph', rawLabel(dungeon, { feature: target, kind }));   // placeholder = default label
     elementKind.textContent = target.label ?? '';
     elementRef.textContent = target.ref ?? letterFor(annotations.length);
     elementText.value = target.note ?? '';
@@ -70,7 +70,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
 
   function findAnnotationByRef(ref: string): AnnotationEntry | null {
     const annotations = relabel(getDungeon());
-    for (const entry of annotations) { if (entry.o.ref === ref) return entry; }
+    for (const entry of annotations) { if (entry.feature.ref === ref) return entry; }
     return null;
   }
 
@@ -80,7 +80,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     const marker = annotatableMarkerAt(dungeon, cellX, cellY);
     if (marker) { openNote(marker, 'marker'); return; }
     const room = roomAt(dungeon, cellX, cellY);
-    if (room) { openNote(room.o, room.kind); return; }
+    if (room) { openNote(room.feature, room.kind); return; }
     // corridor / secret passage -> a loose note keyed to that square
     if (isBaseFloor(dungeon, cellX, cellY) || (dungeon.secretFloor?.[cellY]?.[cellX] === 1)) {
       dungeon.corridorNotes ??= [];
@@ -107,7 +107,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     const dungeon = getDungeon(); if (!dungeon) return;
     const letterElement = box.querySelector('.ck-letter'); if (!letterElement) return;
     const entry = findAnnotationByRef((letterElement.textContent || '').trim()); if (!entry) return;
-    openNote(entry.o, entry.kind, entry.kind === 'corridor' ? dungeon.corridorNotes! : null);
+    openNote(entry.feature, entry.kind, entry.kind === 'corridor' ? dungeon.corridorNotes! : null);
   }
   if (ckContainer) {
     ckContainer.addEventListener('click', (event) => {

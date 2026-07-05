@@ -61,23 +61,49 @@ test('launches sandboxed with no privileged renderer surface', async () => {
   });
 });
 
-test('ships a CSP that forbids inline script yet allows the hashed toolbar script', async () => {
+test('ships a CSP that forbids inline script and inline style', async () => {
   const cspContent = await appWindow.evaluate(() =>
     document
       .querySelector('meta[http-equiv="Content-Security-Policy"]')
       ?.getAttribute('content') ?? '',
   );
   expect(cspContent).toContain("default-src 'self'");
-  const scriptSrcDirective = cspContent
+  const directiveNamed = (name: string) => cspContent
     .split(';')
     .map((directive) => directive.trim())
-    .find((directive) => directive.startsWith('script-src'));
+    .find((directive) => directive.startsWith(name));
+  const scriptSrcDirective = directiveNamed('script-src');
   expect(scriptSrcDirective).toBeDefined();
   expect(scriptSrcDirective).not.toContain("'unsafe-inline'");
-  expect(scriptSrcDirective).toContain("'sha256-");
+  const styleSrcDirective = directiveNamed('style-src');
+  expect(styleSrcDirective).toBeDefined();
+  expect(styleSrcDirective).not.toContain("'unsafe-inline'");
 
-  /* The inline hamburger script must still execute (hash-allowed): its click
-     listener toggles the toolbar's `open` class. */
+  /* No inline <style>/<script> ships anymore — all app CSS and the hamburger
+     logic moved into the bundle (Change 8). */
+  const inlineSurfaces = await appWindow.evaluate(() => ({
+    inlineStyleBlocks: document.querySelectorAll('style').length,
+    inlineScripts: [...document.querySelectorAll('script')].filter((s) => !s.src).length,
+  }));
+  expect(inlineSurfaces.inlineScripts).toBe(0);
+  /* Vite may inject <style> only in dev; the packaged build must not. */
+  expect(inlineSurfaces.inlineStyleBlocks).toBe(0);
+
+  /* App renders fully styled under the tightened CSP. `.toolbar` position:fixed
+     comes from chronicle.css; `.tb-items` display:flex only exists in the
+     extracted dungeon.css — if style-src blocked either stylesheet this fails. */
+  const appIsStyled = await appWindow.evaluate(() => {
+    const toolbar = document.getElementById('toolbar');
+    const toolbarItems = toolbar?.querySelector('.tb-items');
+    return {
+      toolbarPosition: toolbar ? getComputedStyle(toolbar).position : '',
+      itemsDisplay: toolbarItems ? getComputedStyle(toolbarItems).display : '',
+    };
+  });
+  expect(appIsStyled).toEqual({ toolbarPosition: 'fixed', itemsDisplay: 'flex' });
+
+  /* The hamburger controller (extracted from the former inline script) must
+     still work: its click listener toggles the toolbar's `open` class. */
   const toolbarToggles = await appWindow.evaluate(() => {
     const toolbar = document.getElementById('toolbar');
     const toggle = document.getElementById('tb-toggle');

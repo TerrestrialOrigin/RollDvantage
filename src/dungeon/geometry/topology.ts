@@ -60,29 +60,29 @@ export function placeable(dungeon: Dungeon, x: number, y: number): boolean {
   return false;
 }
 
-/** The straight run through (dx,dy) for a given cell test: stops at a turn, junction, room, or dead end. */
-export function straightRunF(dx: number, dy: number, isCell: CellPredicate): StraightRun {
+/** The straight run through (originX,originY) for a given cell test: stops at a turn, junction, room, or dead end. */
+export function straightRunWhere(originX: number, originY: number, isCell: CellPredicate): StraightRun {
   const at: CellPredicate = (x, y) => isCell(x, y);
-  const left = at(dx - 1, dy), right = at(dx + 1, dy), up = at(dx, dy - 1), down = at(dx, dy + 1);
+  const left = at(originX - 1, originY), right = at(originX + 1, originY), up = at(originX, originY - 1), down = at(originX, originY + 1);
   let horiz: boolean;
   if ((left || right) && !(up || down)) horiz = true;
   else if ((up || down) && !(left || right)) horiz = false;
   else if (left && right) horiz = true;
   else if (up && down) horiz = false;
-  else return { cells: [[dx, dy]], horiz: true };
-  const cells: [number, number][] = [[dx, dy]];
+  else return { cells: [[originX, originY]], horiz: true };
+  const cells: [number, number][] = [[originX, originY]];
   let x: number, y: number;
   if (horiz) {
-    for (x = dx + 1; at(x, dy) && !(at(x, dy - 1) || at(x, dy + 1)); x++) cells.push([x, dy]);
-    for (x = dx - 1; at(x, dy) && !(at(x, dy - 1) || at(x, dy + 1)); x--) cells.push([x, dy]);
+    for (x = originX + 1; at(x, originY) && !(at(x, originY - 1) || at(x, originY + 1)); x++) cells.push([x, originY]);
+    for (x = originX - 1; at(x, originY) && !(at(x, originY - 1) || at(x, originY + 1)); x--) cells.push([x, originY]);
   } else {
-    for (y = dy + 1; at(dx, y) && !(at(dx - 1, y) || at(dx + 1, y)); y++) cells.push([dx, y]);
-    for (y = dy - 1; at(dx, y) && !(at(dx - 1, y) || at(dx + 1, y)); y--) cells.push([dx, y]);
+    for (y = originY + 1; at(originX, y) && !(at(originX - 1, y) || at(originX + 1, y)); y++) cells.push([originX, y]);
+    for (y = originY - 1; at(originX, y) && !(at(originX - 1, y) || at(originX + 1, y)); y--) cells.push([originX, y]);
   }
   return { cells, horiz };
 }
 
 /** Straight run over base-floor corridor cells. */
-export function straightRun(dungeon: Dungeon, dx: number, dy: number): StraightRun {
-  return straightRunF(dx, dy, (x, y) => isCorridorCell(dungeon, x, y));
+export function straightRun(dungeon: Dungeon, originX: number, originY: number): StraightRun {
+  return straightRunWhere(originX, originY, (x, y) => isCorridorCell(dungeon, x, y));
 }

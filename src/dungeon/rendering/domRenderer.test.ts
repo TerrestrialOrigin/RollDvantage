@@ -3,11 +3,12 @@
    hostile dungeon name can never become markup. (jsdom) */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { generateDungeon } from 'auto-stuff-generator';
-import type { Dungeon } from '../model/types';
+import type { Dungeon, ExternalDungeon } from '../model/types';
 import { renderDungeon } from './domRenderer';
+import { migrateDungeon } from '../persistence/dungeonFile';
 
 function makeDungeon(): Dungeon {
-  return generateDungeon(0xc0ffee, 3, 'full') as unknown as Dungeon;
+  return migrateDungeon(generateDungeon(0xc0ffee, 3, 'full') as unknown as ExternalDungeon);
 }
 
 describe('renderDungeon accessible names', () => {

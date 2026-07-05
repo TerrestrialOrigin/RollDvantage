@@ -9,11 +9,11 @@
 import type { Dungeon, MarkerType, Annotatable } from '../model/types';
 import { letterFor } from '../rendering/symbols';
 
-export type EntryKind = 'marker' | 'room' | 'sroom' | 'corridor';
+export type EntryKind = 'marker' | 'room' | 'secretRoom' | 'corridor';
 
 /** An annotated feature plus the kind of feature it is. */
 export interface AnnotationEntry {
-  o: Annotatable & { type?: MarkerType; x?: number; y?: number };
+  feature: Annotatable & { type?: MarkerType; x?: number; y?: number };
   kind: EntryKind;
 }
 
@@ -26,36 +26,36 @@ export function typeLabel(type: string): string {
 
 /** The default label for an entry, before any user-supplied title. */
 export function rawLabel(dungeon: Dungeon, entry: AnnotationEntry): string {
-  if (entry.kind === 'marker') return typeLabel(entry.o.type!);
-  if (entry.kind === 'sroom') return 'Secret Chamber';
+  if (entry.kind === 'marker') return typeLabel(entry.feature.type!);
+  if (entry.kind === 'secretRoom') return 'Secret Chamber';
   if (entry.kind === 'room') return 'Chamber';
   if (entry.kind === 'corridor') {
-    return (dungeon.secretFloor?.[entry.o.y!]?.[entry.o.x!] === 1) ? 'Secret Passage' : 'Corridor';
+    return (dungeon.secretFloor?.[entry.feature.y!]?.[entry.feature.x!] === 1) ? 'Secret Passage' : 'Corridor';
   }
   return 'Note';
 }
 
 export function entryLabel(dungeon: Dungeon, entry: AnnotationEntry): string {
-  return entry.o.label ?? rawLabel(dungeon, entry);
+  return entry.feature.label ?? rawLabel(dungeon, entry);
 }
 
 /** Collect annotated features, sort by sequence, assign reference letters (mutates refs). */
 export function relabel(dungeon: Dungeon | null): AnnotationEntry[] {
   if (!dungeon) return [];
   const annotations: AnnotationEntry[] = [];
-  (dungeon.markers || []).forEach((marker) => { if (marker.note || marker.label) annotations.push({ o: marker, kind: 'marker' }); });
-  (dungeon.rooms || []).forEach((room) => { if (room.note || room.label) annotations.push({ o: room, kind: 'room' }); });
-  (dungeon.secretRooms ?? []).forEach((room) => { if (room.note || room.label) annotations.push({ o: room, kind: 'sroom' }); });
-  (dungeon.corridorNotes ?? []).forEach((note) => { if (note.note || note.label) annotations.push({ o: note, kind: 'corridor' }); });
-  annotations.sort((a, b) => (a.o.seq ?? 0) - (b.o.seq ?? 0));
+  (dungeon.markers || []).forEach((marker) => { if (marker.note || marker.label) annotations.push({ feature: marker, kind: 'marker' }); });
+  (dungeon.rooms || []).forEach((room) => { if (room.note || room.label) annotations.push({ feature: room, kind: 'room' }); });
+  (dungeon.secretRooms ?? []).forEach((room) => { if (room.note || room.label) annotations.push({ feature: room, kind: 'secretRoom' }); });
+  (dungeon.corridorNotes ?? []).forEach((note) => { if (note.note || note.label) annotations.push({ feature: note, kind: 'corridor' }); });
+  annotations.sort((a, b) => (a.feature.seq ?? 0) - (b.feature.seq ?? 0));
   let maxSeq = -1;
-  annotations.forEach((entry, index) => { entry.o.ref = letterFor(index); if ((entry.o.seq ?? 0) > maxSeq) maxSeq = (entry.o.seq ?? 0); });
+  annotations.forEach((entry, index) => { entry.feature.ref = letterFor(index); if ((entry.feature.seq ?? 0) > maxSeq) maxSeq = (entry.feature.seq ?? 0); });
   if (dungeon._seq == null || dungeon._seq <= maxSeq) dungeon._seq = maxSeq + 1;
   return annotations;
 }
 
 /** HTML-escape user text for both text-node and attribute contexts. */
-export function esc(value: unknown): string {
+export function escapeHtml(value: unknown): string {
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

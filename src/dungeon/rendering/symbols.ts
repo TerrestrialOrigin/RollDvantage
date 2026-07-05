@@ -89,12 +89,16 @@ export function symbol(marker: { type: MarkerType; dir?: Direction; ref?: string
   return '<g class="mk">' + glyph + '</g>';
 }
 
+/** The demo marker each preview icon shows, per type (entrance & exit
+    triangles both point up). One exported map (M6) — used by `iconSVG` and
+    the toolbar's static legend icons. */
+export const MARKER_PREVIEW_SPECS: Record<MarkerType, { type: MarkerType; dir?: Direction }> = {
+  entrance: { type: 'entrance', dir: 'up' }, exit: { type: 'exit', dir: 'down' },
+  trap: { type: 'trap' }, monster: { type: 'monster' }, boss: { type: 'boss' },
+  treasure: { type: 'treasure' }, secret: { type: 'secret' }, other: { type: 'other' },
+};
+
 /** A standalone 30×30 icon used by the legend and drag ghost. */
 export function iconSVG(type: MarkerType): string {
-  const demo: Record<MarkerType, { type: MarkerType; dir?: Direction }> = {
-    entrance: { type: 'entrance', dir: 'up' }, exit: { type: 'exit', dir: 'down' },
-    trap: { type: 'trap' }, monster: { type: 'monster' }, boss: { type: 'boss' },
-    treasure: { type: 'treasure' }, secret: { type: 'secret' }, other: { type: 'other' },
-  };
-  return '<svg viewBox="0 0 30 30" width="32" height="32" xmlns="http://www.w3.org/2000/svg">' + symbol(demo[type], 15, 15) + '</svg>';
+  return '<svg viewBox="0 0 30 30" width="32" height="32" xmlns="http://www.w3.org/2000/svg">' + symbol(MARKER_PREVIEW_SPECS[type], 15, 15) + '</svg>';
 }

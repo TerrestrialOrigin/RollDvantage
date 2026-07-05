@@ -3,18 +3,18 @@
    Logic preserved verbatim from the original closure helpers.
    ============================================================ */
 import type { Dungeon, Marker, Room } from '../model/types';
-import { roomIndexAt, secretRoomIndexAt, isBaseFloor, straightRun, straightRunF, isSecretCorridorCell } from '../geometry/topology';
+import { roomIndexAt, secretRoomIndexAt, isBaseFloor, straightRun, straightRunWhere, isSecretCorridorCell } from '../geometry/topology';
 
 export type FeatureKind = 'marker' | 'room' | 'secret-room' | 'corridor' | 'secret-corridor';
 
 export interface Feature {
   kind: FeatureKind;
-  idx?: number;
+  index?: number;
   marker?: Marker;
   room?: Room;
 }
 
-export interface BBox { ax: number; ay: number; bx: number; by: number; }
+export interface BBox { minX: number; minY: number; maxX: number; maxY: number; }
 
 /** Marker types that can carry an annotation. */
 const ANNOTATABLE: Record<string, boolean> = { monster: true, boss: true, treasure: true, trap: true, secret: true, other: true };
@@ -32,18 +32,18 @@ export function annotatableMarkerAt(dungeon: Dungeon, x: number, y: number): Mar
 }
 
 /** The room or secret room containing (x,y), tagged with its annotation kind, or null. */
-export function roomAt(dungeon: Dungeon, x: number, y: number): { o: Room; kind: 'room' | 'sroom' } | null {
+export function roomAt(dungeon: Dungeon, x: number, y: number): { feature: Room; kind: 'room' | 'secretRoom' } | null {
   const rooms = dungeon.rooms || [];
-  for (const room of rooms) { if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return { o: room, kind: 'room' }; }
+  for (const room of rooms) { if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return { feature: room, kind: 'room' }; }
   const secretRooms = dungeon.secretRooms ?? [];
-  for (const room of secretRooms) { if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return { o: room, kind: 'sroom' }; }
+  for (const room of secretRooms) { if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return { feature: room, kind: 'secretRoom' }; }
   return null;
 }
 
 /** Classify whatever feature occupies (x,y). */
 export function featureAt(dungeon: Dungeon, x: number, y: number): Feature | null {
   const markerIndex = markerAtCell(dungeon, x, y);
-  if (markerIndex >= 0 && dungeon.markers[markerIndex].type !== 'secret') return { kind: 'marker', idx: markerIndex, marker: dungeon.markers[markerIndex] };
+  if (markerIndex >= 0 && dungeon.markers[markerIndex].type !== 'secret') return { kind: 'marker', index: markerIndex, marker: dungeon.markers[markerIndex] };
   const roomIndex = roomIndexAt(dungeon, x, y); if (roomIndex >= 0) return { kind: 'room', room: dungeon.rooms[roomIndex] };
   const secretIndex = secretRoomIndexAt(dungeon, x, y);
   const secretRoom = secretIndex >= 0 ? (dungeon.secretRooms ?? [])[secretIndex] : undefined;
@@ -54,14 +54,16 @@ export function featureAt(dungeon: Dungeon, x: number, y: number): Feature | nul
 }
 
 /** The bounding box of a feature (room rect, or the straight run through a corridor cell). */
-export function featureBBox(dungeon: Dungeon, feature: Feature, gx: number, gy: number): BBox {
+export function featureBBox(dungeon: Dungeon, feature: Feature, gridX: number, gridY: number): BBox {
   if (feature.kind === 'room' || feature.kind === 'secret-room') {
     const room = feature.room;
-    if (!room) return { ax: gx, ay: gy, bx: gx, by: gy }; // defensive: room features always carry their room
-    return { ax: room.x, ay: room.y, bx: room.x + room.w - 1, by: room.y + room.h - 1 };
+    if (!room) return { minX: gridX, minY: gridY, maxX: gridX, maxY: gridY }; // defensive: room features always carry their room
+    return { minX: room.x, minY: room.y, maxX: room.x + room.w - 1, maxY: room.y + room.h - 1 };
   }
-  const run = (feature.kind === 'corridor') ? straightRun(dungeon, gx, gy).cells : straightRunF(gx, gy, (x, y) => isSecretCorridorCell(dungeon, x, y)).cells;
-  let ax = 1e9, ay = 1e9, bx = -1, by = -1;
-  run.forEach((cell) => { if (cell[0] < ax) ax = cell[0]; if (cell[0] > bx) bx = cell[0]; if (cell[1] < ay) ay = cell[1]; if (cell[1] > by) by = cell[1]; });
-  return { ax, ay, bx, by };
+  const run = (feature.kind === 'corridor') ? straightRun(dungeon, gridX, gridY).cells : straightRunWhere(gridX, gridY, (x, y) => isSecretCorridorCell(dungeon, x, y)).cells;
+  // Infinity sentinels (not 1e9/-1): runs are never empty — straightRunWhere
+  // always includes the origin cell — so every bound is overwritten below.
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  run.forEach((cell) => { if (cell[0] < minX) minX = cell[0]; if (cell[0] > maxX) maxX = cell[0]; if (cell[1] < minY) minY = cell[1]; if (cell[1] > maxY) maxY = cell[1]; });
+  return { minX, minY, maxX, maxY };
 }

@@ -2,20 +2,29 @@
    Toolbar controller — generate menu + unsaved-changes warning, level stepper,
    undo/redo (buttons + keyboard), save/load/export, the inline-editable
    name/depth/flavor fields, and the static legend icons. All dungeon changes go
-   through the DungeonEditor. Logic preserved verbatim from the original.
+   through the DungeonEditor; the generate menu's popup lifecycle lives in the
+   shared floatingMenu helper. Logic preserved verbatim from the original.
    ============================================================ */
-import type { Dungeon, MarkerType, Direction } from '../model/types';
-import { symbol } from '../rendering/symbols';
+import type { Dungeon, MarkerType } from '../model/types';
+import { symbol, MARKER_PREVIEW_SPECS } from '../rendering/symbols';
 import { updateFootNames } from '../rendering/domRenderer';
 import { downloadDungeon, readDungeonFile, InvalidDungeonFileError } from '../persistence/dungeonFile';
 import { MIN_LEVEL, MAX_LEVEL, type DungeonStore } from '../state/dungeonStore';
-import { openDialog, applyMenuSemantics, type DialogSession, type MenuSemantics } from './dialogA11y';
+import { openDialog, type DialogSession } from './dialogA11y';
+import { openFloatingMenu, type FloatingMenuSession } from './floatingMenu';
+import { createListenerBag } from './listenerBag';
 import type { GenerationMode, DungeonEditor } from '../api/dungeonEditor';
 
-export interface ToolbarHandles { updateLevelUI: () => void; updateUndoRedoUI: () => void; }
+export interface ToolbarHandles {
+  updateLevelUI: () => void;
+  updateUndoRedoUI: () => void;
+  /** Close any open popup and remove every listener this controller registered. */
+  detach: () => void;
+}
 
 export function attachToolbarController(editor: DungeonEditor, store: DungeonStore): ToolbarHandles {
   const getDungeon = (): Dungeon | null => store.getCurrent();
+  const bag = createListenerBag();
 
   // ---- level ----
   function updateLevelUI(): void {
@@ -28,22 +37,15 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
   function setLevel(value: number): void { editor.setLevel(value); updateLevelUI(); }
 
   const levelDown = document.getElementById('lvl-down');
-  if (levelDown) levelDown.addEventListener('click', () => setLevel(store.getLevel() - 1));
+  if (levelDown) bag.listen(levelDown, 'click', () => setLevel(store.getLevel() - 1));
   const levelUp = document.getElementById('lvl-up');
-  if (levelUp) levelUp.addEventListener('click', () => setLevel(store.getLevel() + 1));
+  if (levelUp) bag.listen(levelUp, 'click', () => setLevel(store.getLevel() + 1));
 
   // ---- generate menu + unsaved warning ----
   const newButton = document.getElementById('btn-new');
   let pendingMode: GenerationMode = 'full';
-  let genMenu: HTMLElement | null = null;
-  let genMenuSemantics: MenuSemantics | null = null;
-  function closeGenMenu(): void {
-    if (!genMenu) return;
-    genMenu.remove(); genMenu = null;
-    document.removeEventListener('pointerdown', genMenuOutside, true);
-    genMenuSemantics?.restoreFocus(); genMenuSemantics = null;
-  }
-  function genMenuOutside(event: PointerEvent): void { if (genMenu && !genMenu.contains(event.target as Node) && event.target !== newButton) closeGenMenu(); }
+  let genMenuSession: FloatingMenuSession | null = null;
+  function closeGenMenu(): void { genMenuSession?.close(); }
   function startGenerate(mode: GenerationMode): void { pendingMode = mode; closeGenMenu(); if (store.isDirty()) openGenWarn(); else editor.generate(mode); }
   function openGenMenu(): void {
     closeGenMenu();
@@ -53,14 +55,14 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
       button.addEventListener('click', () => { startGenerate(option[1]); });
       menu.appendChild(button);
     });
-    document.body.appendChild(menu); genMenu = menu;
-    const rect = newButton!.getBoundingClientRect();
-    menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
-    menu.style.top = Math.max(8, rect.top - menu.offsetHeight - 8) + 'px';
-    genMenuSemantics = applyMenuSemantics(menu, closeGenMenu);
-    setTimeout(() => { document.addEventListener('pointerdown', genMenuOutside, true); }, 0);
+    genMenuSession = openFloatingMenu({
+      menu,
+      position: { kind: 'above', anchor: newButton! },
+      ignoreOutsideOn: newButton,
+      onClose: () => { genMenuSession = null; },
+    });
   }
-  if (newButton) newButton.addEventListener('click', openGenMenu);
+  if (newButton) bag.listen(newButton, 'click', openGenMenu);
 
   const genWarn = document.getElementById('gen-warn');
   let genWarnSession: DialogSession | null = null;
@@ -79,10 +81,10 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
     else if (genWarn) genWarn.hidden = true;
   }
   if (genWarn) {
-    (genWarn.querySelector('.note-backdrop')!).addEventListener('click', closeGenWarn);
-    document.getElementById('gw-cancel')!.addEventListener('click', closeGenWarn);
-    document.getElementById('gw-save')!.addEventListener('click', () => { closeGenWarn(); saveDungeon(); editor.generate(pendingMode); });
-    document.getElementById('gw-discard')!.addEventListener('click', () => { closeGenWarn(); editor.generate(pendingMode); });
+    bag.listen(genWarn.querySelector('.note-backdrop')!, 'click', closeGenWarn);
+    bag.listen(document.getElementById('gw-cancel')!, 'click', closeGenWarn);
+    bag.listen(document.getElementById('gw-save')!, 'click', () => { closeGenWarn(); saveDungeon(); editor.generate(pendingMode); });
+    bag.listen(document.getElementById('gw-discard')!, 'click', () => { closeGenWarn(); editor.generate(pendingMode); });
   }
 
   // ---- undo / redo ----
@@ -92,9 +94,9 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
     if (undo) undo.disabled = !editor.canUndo();
     if (redo) redo.disabled = !editor.canRedo();
   }
-  const undoButton = document.getElementById('btn-undo'); if (undoButton) undoButton.addEventListener('click', () => editor.undo());
-  const redoButton = document.getElementById('btn-redo'); if (redoButton) redoButton.addEventListener('click', () => editor.redo());
-  window.addEventListener('keydown', (event) => {
+  const undoButton = document.getElementById('btn-undo'); if (undoButton) bag.listen(undoButton, 'click', () => editor.undo());
+  const redoButton = document.getElementById('btn-redo'); if (redoButton) bag.listen(redoButton, 'click', () => editor.redo());
+  bag.listen<KeyboardEvent>(window, 'keydown', (event) => {
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const active = document.activeElement;                       // never hijack text editing
     if (active && ((active as HTMLElement).isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
@@ -105,7 +107,7 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
 
   // ---- save ----
   function saveDungeon(): void { const dungeon = getDungeon(); if (dungeon) downloadDungeon(dungeon); }
-  const saveButton = document.getElementById('btn-save'); if (saveButton) saveButton.addEventListener('click', saveDungeon);
+  const saveButton = document.getElementById('btn-save'); if (saveButton) bag.listen(saveButton, 'click', saveDungeon);
 
   // ---- export (print-to-PDF bleed layout) ----
   function cleanupBleed(): void {
@@ -113,15 +115,18 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
     const style = document.getElementById('bleed-page-style'); if (style) style.remove();
   }
   const exportButton = document.getElementById('btn-export');
-  if (exportButton) exportButton.addEventListener('click', () => {
+  if (exportButton) bag.listen(exportButton, 'click', () => {
     cleanupBleed();
     const style = document.createElement('style'); style.id = 'bleed-page-style';
     style.textContent = '@page{ size:8.75in 11.25in; margin:0; }';
     document.head.appendChild(style);
     document.documentElement.classList.add('pdf-bleed');
-    setTimeout(() => { window.print(); }, 60);
+    /* Print only after the bleed class has actually been laid out: the first
+       frame applies styles, the second guarantees the layout flush the old
+       setTimeout(,60) merely approximated. */
+    requestAnimationFrame(() => { requestAnimationFrame(() => { window.print(); }); });
   });
-  window.addEventListener('afterprint', cleanupBleed);
+  bag.listen(window, 'afterprint', cleanupBleed);
 
   // ---- load ----
   function loadFile(file: File): void {
@@ -132,25 +137,20 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
   const loadButton = document.getElementById('btn-load');
   const fileInput = document.getElementById('file-load') as HTMLInputElement | null;
   if (loadButton && fileInput) {
-    loadButton.addEventListener('click', () => { fileInput.click(); });
-    fileInput.addEventListener('change', () => { if (fileInput.files?.[0]) loadFile(fileInput.files[0]); fileInput.value = ''; });
+    bag.listen(loadButton, 'click', () => { fileInput.click(); });
+    bag.listen(fileInput, 'change', () => { if (fileInput.files?.[0]) loadFile(fileInput.files[0]); fileInput.value = ''; });
   }
 
-  // ---- static legend icons (entrance & exit triangles both point up) ----
+  // ---- static legend icons (shared preview map — entrance & exit both point up) ----
   document.querySelectorAll('[data-icon]').forEach((element) => {
     const type = element.getAttribute('data-icon') as MarkerType;
-    const demo: Record<MarkerType, { type: MarkerType; dir?: Direction }> = {
-      entrance: { type: 'entrance', dir: 'up' }, exit: { type: 'exit', dir: 'down' },
-      trap: { type: 'trap' }, monster: { type: 'monster' }, boss: { type: 'boss' },
-      treasure: { type: 'treasure' }, secret: { type: 'secret' }, other: { type: 'other' },
-    };
-    element.innerHTML = '<svg viewBox="0 0 30 30" class="legend-svg" xmlns="http://www.w3.org/2000/svg">' + symbol(demo[type], 15, 15) + '</svg>';
+    element.innerHTML = '<svg viewBox="0 0 30 30" class="legend-svg" xmlns="http://www.w3.org/2000/svg">' + symbol(MARKER_PREVIEW_SPECS[type], 15, 15) + '</svg>';
   });
 
-  // ---- inline-editable name / depth ----
-  function wireEditable(aId: string, bId: string, field: 'name' | 'depth'): void {
-    const a = document.getElementById(aId), b = document.getElementById(bId);
-    if (!a || !b) return;
+  // ---- inline-editable name / depth (the DM and player pages mirror each other) ----
+  function wireEditable(dmFieldId: string, playerFieldId: string, field: 'name' | 'depth'): void {
+    const dmField = document.getElementById(dmFieldId), playerField = document.getElementById(playerFieldId);
+    if (!dmField || !playerField) return;
     function onInput(source: HTMLElement, target: HTMLElement): () => void {
       return () => {
         const dungeon = getDungeon();
@@ -160,11 +160,11 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
         if (field === 'name') updateFootNames(getDungeon()?.name);
       };
     }
-    a.addEventListener('input', onInput(a, b));
-    b.addEventListener('input', onInput(b, a));
-    [a, b].forEach((element) => {
-      element.addEventListener('keydown', (event) => { if ((event).key === 'Enter') { event.preventDefault(); (element).blur(); } });
-      element.addEventListener('blur', () => { const dungeon = getDungeon(); if (dungeon) (dungeon as unknown as Record<string, string>)[field] = element.textContent.trim(); });
+    bag.listen(dmField, 'input', onInput(dmField, playerField));
+    bag.listen(playerField, 'input', onInput(playerField, dmField));
+    [dmField, playerField].forEach((element) => {
+      bag.listen<KeyboardEvent>(element, 'keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); element.blur(); } });
+      bag.listen(element, 'blur', () => { const dungeon = getDungeon(); if (dungeon) (dungeon as unknown as Record<string, string>)[field] = element.textContent.trim(); });
     });
   }
   wireEditable('dungeon-name-dm', 'dungeon-name-pl', 'name');
@@ -173,10 +173,14 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
   // ---- editable + deletable closing flourish on the player map ----
   const flavor = document.getElementById('pl-flavor');
   if (flavor) {
-    flavor.addEventListener('input', () => { const dungeon = getDungeon(); if (dungeon) dungeon.flavor = flavor.textContent || ''; store.setDirty(true); });
-    flavor.addEventListener('keydown', (event) => { if ((event).key === 'Enter') { event.preventDefault(); flavor.blur(); } });
-    flavor.addEventListener('blur', () => { const dungeon = getDungeon(); if (dungeon) dungeon.flavor = (flavor.textContent || '').trim(); });
+    bag.listen(flavor, 'input', () => { const dungeon = getDungeon(); if (dungeon) dungeon.flavor = flavor.textContent || ''; store.setDirty(true); });
+    bag.listen<KeyboardEvent>(flavor, 'keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); flavor.blur(); } });
+    bag.listen(flavor, 'blur', () => { const dungeon = getDungeon(); if (dungeon) dungeon.flavor = (flavor.textContent || '').trim(); });
   }
 
-  return { updateLevelUI, updateUndoRedoUI };
+  return {
+    updateLevelUI,
+    updateUndoRedoUI,
+    detach() { closeGenMenu(); closeGenWarn(); bag.detach(); },
+  };
 }

@@ -24,9 +24,7 @@ const buildCspContent = (html: string): string => {
   return [
     "default-src 'self'",
     `script-src ${scriptSources}`,
-    /* 'unsafe-inline' styles are an accepted interim risk until the inline
-       <style> block is extracted (Change 8) — see the change's ThreatModel.md. */
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "style-src 'self' https://fonts.googleapis.com",
     "font-src https://fonts.gstatic.com",
     "img-src 'self' data: blob:",
     "connect-src 'self'",

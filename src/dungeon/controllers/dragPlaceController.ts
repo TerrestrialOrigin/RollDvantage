@@ -10,6 +10,8 @@ import { iconSVG } from '../rendering/symbols';
 import { placeable, roomIndexAt, isCorridorCell } from '../geometry/topology';
 import { markerAtCell } from '../editing/featureQueries';
 import { dmSvg, cellAtClient } from './mapSurface';
+import { DRAG_ARM_THRESHOLD_PX } from './constants';
+import { createListenerBag } from './listenerBag';
 import type { ControllerContext } from './types';
 import type { CellHit } from '../geometry/grid';
 
@@ -25,9 +27,15 @@ interface DragState {
   startY: number;
 }
 
-export function attachDragPlaceController(context: ControllerContext): void {
+export interface DragPlaceHandles {
+  /** Abort any in-flight drag and remove every listener this controller registered. */
+  detach: () => void;
+}
+
+export function attachDragPlaceController(context: ControllerContext): DragPlaceHandles {
   const { editor, getDungeon, modes } = context;
   const dmWrap = document.getElementById('dm-map');
+  const bag = createListenerBag();
   let drag: DragState | null = null;
 
   function showTarget(cell: CellHit): void {
@@ -49,8 +57,8 @@ export function attachDragPlaceController(context: ControllerContext): void {
   function onMove(event: PointerEvent): void {
     if (!drag) return;
     if (!drag.armed) {
-      const dx = event.clientX - drag.startX, dy = event.clientY - drag.startY;
-      if (dx * dx + dy * dy < 16) return;   // ignore <4px jitter so a plain click isn't a move
+      const deltaX = event.clientX - drag.startX, deltaY = event.clientY - drag.startY;
+      if (deltaX * deltaX + deltaY * deltaY < DRAG_ARM_THRESHOLD_PX * DRAG_ARM_THRESHOLD_PX) return;   // jitter under the arm threshold: a plain click isn't a move
       arm();
     }
     drag.ghost.style.left = event.clientX + 'px'; drag.ghost.style.top = event.clientY + 'px';
@@ -110,16 +118,15 @@ export function attachDragPlaceController(context: ControllerContext): void {
   // legend icons -> place a new mark
   document.querySelectorAll('.legend-item').forEach((item) => {
     const icon = item.querySelector('[data-icon]'); if (!icon) return;
-    item.addEventListener('pointerdown', (event) => {
+    bag.listen<PointerEvent>(item, 'pointerdown', (event) => {
       event.preventDefault();
-      startDrag({ mode: 'place', type: icon.getAttribute('data-icon') as MarkerType }, event as PointerEvent);
+      startDrag({ mode: 'place', type: icon.getAttribute('data-icon') as MarkerType }, event);
     });
   });
 
   // marks already on the map -> drag to move
   if (dmWrap) {
-    dmWrap.addEventListener('pointerdown', (event) => {
-      const pointerEvent = event;
+    bag.listen<PointerEvent>(dmWrap, 'pointerdown', (pointerEvent) => {
       if (modes.current) return;                 // structure-editing mode takes over
       if (pointerEvent.button !== 0) return;      // left button only
       const dungeon = getDungeon();
@@ -130,4 +137,11 @@ export function attachDragPlaceController(context: ControllerContext): void {
       startDrag({ mode: 'move', type: dungeon.markers[index].type, index }, pointerEvent);
     });
   }
+
+  return {
+    detach() {
+      cleanup();      // aborts any in-flight drag (also removes the transient window listeners)
+      bag.detach();
+    },
+  };
 }

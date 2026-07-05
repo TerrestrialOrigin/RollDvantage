@@ -1,17 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { generateDungeon } from 'auto-stuff-generator';
 import { commitRoom, commitDelete } from './structureOps';
+import { migrateDungeon } from '../persistence/dungeonFile';
 import { convertSecretAt, unconvertSecret } from './secretOps';
 import { applyNote, removeNote } from './noteOps';
-import type { Dungeon } from '../model/types';
+import type { Dungeon, ExternalDungeon } from '../model/types';
 
 function freshDungeon(): Dungeon {
-  return JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'detailed'))) as Dungeon;
+  return migrateDungeon(JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'detailed'))) as ExternalDungeon);
 }
 
 describe('structureOps', () => {
   it('commitRoom adds floor and a room record with a new id', () => {
-    const dungeon = { grid: { gw: 5, gh: 5, cell: 20 }, floor: Array.from({ length: 5 }, () => new Array<number>(5).fill(0)), rooms: [], markers: [] } as unknown as Dungeon;
+    const dungeon = { grid: { width: 5, height: 5, cell: 20 }, floor: Array.from({ length: 5 }, () => new Array<number>(5).fill(0)), rooms: [], markers: [] } as unknown as Dungeon;
     commitRoom(dungeon, 1, 1, 2, 2);
     expect(dungeon.floor[1][1]).toBe(1);
     expect(dungeon.floor[2][2]).toBe(1);
@@ -21,7 +22,7 @@ describe('structureOps', () => {
 
   it('commitDelete clears floor and drops orphaned rooms + markers', () => {
     const dungeon = {
-      grid: { gw: 4, gh: 4, cell: 20 },
+      grid: { width: 4, height: 4, cell: 20 },
       floor: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 0, 0]],
       rooms: [{ x: 1, y: 1, w: 2, h: 2, id: 1 }],
       markers: [{ type: 'monster', x: 1, y: 1 }],
@@ -41,7 +42,7 @@ function corridorDungeon(): Dungeon {
   floor[2][1] = floor[2][2] = floor[2][3] = floor[2][4] = 1;
   return {
     seed: 1, name: 'Corridor Test', depth: 'Depth 1',
-    grid: { gw: gridWidth, gh: gridHeight, cell: 24 },
+    grid: { width: gridWidth, height: gridHeight, cell: 24 },
     floor, rooms: [], markers: [],
     tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 0 },
   };
@@ -78,7 +79,7 @@ describe('commitDelete — secret cleanup (M9)', () => {
     secretFloor[4][1] = secretFloor[4][2] = secretFloor[4][3] = 1;                     // secret passage
     const dungeon = {
       seed: 2, name: 'Secret Cleanup', depth: 'Depth 1',
-      grid: { gw: gridWidth, gh: gridHeight, cell: 24 },
+      grid: { width: gridWidth, height: gridHeight, cell: 24 },
       floor, secretFloor,
       rooms: [],
       secretRooms: [{ x: 1, y: 1, w: 2, h: 2, id: 1 }],

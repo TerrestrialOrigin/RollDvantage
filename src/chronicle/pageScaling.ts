@@ -1,5 +1,6 @@
 /* Responsive page scaling — wraps every .page and scales it to fit narrow
-   viewports (the reflow below 700px is handled in CSS). Logic preserved verbatim. */
+   viewports (the reflow below the narrow breakpoint is handled in CSS). */
+import { NARROW_LAYOUT_QUERY } from './breakpoints';
 
 /**
  * The page's natural (unscaled) width in CSS pixels, derived from the
@@ -26,9 +27,9 @@ export function wrapPages(): void {
   });
 }
 
-/** Scale each wrapped page to fit its available width (no scaling ≤700px). */
+/** Scale each wrapped page to fit its available width (no scaling in the narrow layout). */
 export function fit(): void {
-  const small = window.matchMedia('(max-width:700px)').matches;
+  const small = window.matchMedia(NARROW_LAYOUT_QUERY).matches;
   document.querySelectorAll<HTMLElement>('.page-wrap').forEach((wrap) => {
     const page = wrap.querySelector<HTMLElement>('.page');
     if (!page) return;

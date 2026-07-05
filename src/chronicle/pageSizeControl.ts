@@ -3,6 +3,9 @@
    popup to choose a preset or a custom size. Screen-only (hidden in print). On
    change it updates the geometry variables (via the controller) and re-fits the
    on-screen scaling; the printed sheet auto-fits regardless.
+
+   Split (M12): buildControlMarkup constructs the DOM; the small wire* helpers
+   attach one concern each; setupPageSizeControl just composes them.
    ============================================================ */
 import { PRESETS, validateCustom, type PageSize, type Unit, type PageSizeController } from './pageSize';
 
@@ -14,12 +17,13 @@ const PAPER_ICON =
 
 function presetKeyFor(size: PageSize): string | null {
   for (const [key, preset] of Object.entries(PRESETS)) {
-    if (preset.w === size.w && preset.h === size.h && preset.unit === size.unit) return key;
+    if (preset.width === size.width && preset.height === size.height && preset.unit === size.unit) return key;
   }
   return null;
 }
 
-export function setupPageSizeControl(controller: PageSizeController): void {
+/** The control's DOM, appended to <body>: toggle button + choice popup. */
+function buildControlMarkup(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page-size-control';
   root.innerHTML =
@@ -40,24 +44,44 @@ export function setupPageSizeControl(controller: PageSizeController): void {
     '  <div class="ps-msg" aria-live="polite"></div>' +
     '</div>';
   document.body.appendChild(root);
+  return root;
+}
 
-  const toggle = root.querySelector<HTMLButtonElement>('.ps-toggle')!;
-  const popup = root.querySelector<HTMLDivElement>('.ps-popup')!;
-  const widthInput = root.querySelector<HTMLInputElement>('.ps-w')!;
-  const heightInput = root.querySelector<HTMLInputElement>('.ps-h')!;
-  const unitSelect = root.querySelector<HTMLSelectElement>('.ps-unit')!;
-  const message = root.querySelector<HTMLDivElement>('.ps-msg')!;
+interface ControlView {
+  root: HTMLElement;
+  toggle: HTMLButtonElement;
+  popup: HTMLDivElement;
+  widthInput: HTMLInputElement;
+  heightInput: HTMLInputElement;
+  unitSelect: HTMLSelectElement;
+  message: HTMLDivElement;
+}
+
+function queryControlView(root: HTMLElement): ControlView {
+  return {
+    root,
+    toggle: root.querySelector<HTMLButtonElement>('.ps-toggle')!,
+    popup: root.querySelector<HTMLDivElement>('.ps-popup')!,
+    widthInput: root.querySelector<HTMLInputElement>('.ps-w')!,
+    heightInput: root.querySelector<HTMLInputElement>('.ps-h')!,
+    unitSelect: root.querySelector<HTMLSelectElement>('.ps-unit')!,
+    message: root.querySelector<HTMLDivElement>('.ps-msg')!,
+  };
+}
+
+export function setupPageSizeControl(controller: PageSizeController): void {
+  const view = queryControlView(buildControlMarkup());
 
   function reflectCurrent(): void {
     const size = controller.get();
     const activeKey = presetKeyFor(size);
-    root.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((button) => {
+    view.root.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((button) => {
       button.classList.toggle('active', button.dataset.preset === activeKey);
     });
-    widthInput.value = String(size.w);
-    heightInput.value = String(size.h);
-    unitSelect.value = size.unit;
-    message.textContent = '';
+    view.widthInput.value = String(size.width);
+    view.heightInput.value = String(size.height);
+    view.unitSelect.value = size.unit;
+    view.message.textContent = '';
   }
 
   function apply(size: PageSize): void {
@@ -72,37 +96,49 @@ export function setupPageSizeControl(controller: PageSizeController): void {
   let isOpen = false;
   function setOpen(open: boolean): void {
     isOpen = open;
-    popup.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
+    view.popup.hidden = !open;
+    view.toggle.setAttribute('aria-expanded', String(open));
     if (open) reflectCurrent();
   }
 
-  toggle.addEventListener('click', (event) => { event.stopPropagation(); setOpen(!isOpen); });
+  function wireToggle(): void {
+    view.toggle.addEventListener('click', (event) => { event.stopPropagation(); setOpen(!isOpen); });
+  }
 
-  root.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const preset = PRESETS[button.dataset.preset ?? ''];
-      if (preset) apply({ ...preset });
+  function wirePresetButtons(): void {
+    view.root.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const preset = PRESETS[button.dataset.preset ?? ''];
+        if (preset) apply({ ...preset });
+      });
     });
-  });
+  }
 
-  root.querySelector<HTMLButtonElement>('.ps-apply')!.addEventListener('click', () => {
-    const unit = unitSelect.value as Unit;
-    const size = validateCustom(widthInput.value, heightInput.value, unit);
-    if (!size) {
-      message.textContent = 'Enter positive width and height (3–48 in).';
-      return; // previous valid size is retained
-    }
-    apply(size);
-  });
+  function wireCustomApply(): void {
+    view.root.querySelector<HTMLButtonElement>('.ps-apply')!.addEventListener('click', () => {
+      const unit = view.unitSelect.value as Unit;
+      const size = validateCustom(view.widthInput.value, view.heightInput.value, unit);
+      if (!size) {
+        view.message.textContent = 'Enter positive width and height (3–48 in).';
+        return; // previous valid size is retained
+      }
+      apply(size);
+    });
+  }
 
-  // dismiss on outside click / Escape
-  document.addEventListener('click', (event) => {
-    if (isOpen && !root.contains(event.target as Node)) setOpen(false);
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && isOpen) { setOpen(false); toggle.focus(); }
-  });
+  function wireDismissal(): void {
+    // dismiss on outside click / Escape
+    document.addEventListener('click', (event) => {
+      if (isOpen && !view.root.contains(event.target as Node)) setOpen(false);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && isOpen) { setOpen(false); view.toggle.focus(); }
+    });
+  }
 
+  wireToggle();
+  wirePresetButtons();
+  wireCustomApply();
+  wireDismissal();
   reflectCurrent();
 }

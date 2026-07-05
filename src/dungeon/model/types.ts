@@ -26,10 +26,23 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 export type FloorGrid = number[][];
 
 export interface Grid {
+  width: number;
+  height: number;
+  cell: number;
+}
+
+/** The grid as the external schema spells it (generator output and `.dungeon`
+    files use abbreviated keys). Confined to the persistence/adoption boundary,
+    where `migrateDungeon` maps it to the internal `Grid`. */
+export interface ExternalGrid {
   gw: number;
   gh: number;
   cell: number;
 }
+
+/** A dungeon as it exists outside the app (file on disk / generator output):
+    identical to `Dungeon` except for the abbreviated grid schema. */
+export type ExternalDungeon = Omit<Dungeon, 'grid'> & { grid: ExternalGrid };
 
 /** Fields shared by anything that can carry a Contents-Key annotation. */
 export interface Annotatable {

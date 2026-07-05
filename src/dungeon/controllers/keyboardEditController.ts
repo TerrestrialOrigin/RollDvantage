@@ -45,8 +45,8 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
 
   function clampToGrid(dungeon: Dungeon, position: CellPosition): CellPosition {
     return {
-      x: Math.max(0, Math.min(dungeon.grid.gw - 1, position.x)),
-      y: Math.max(0, Math.min(dungeon.grid.gh - 1, position.y)),
+      x: Math.max(0, Math.min(dungeon.grid.width - 1, position.x)),
+      y: Math.max(0, Math.min(dungeon.grid.height - 1, position.y)),
     };
   }
 
@@ -167,7 +167,7 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
   };
 
   function ensureCursor(dungeon: Dungeon): CellPosition {
-    cursor ??= clampToGrid(dungeon, { x: Math.floor(dungeon.grid.gw / 2), y: Math.floor(dungeon.grid.gh / 2) });
+    cursor ??= clampToGrid(dungeon, { x: Math.floor(dungeon.grid.width / 2), y: Math.floor(dungeon.grid.height / 2) });
     return cursor;
   }
 

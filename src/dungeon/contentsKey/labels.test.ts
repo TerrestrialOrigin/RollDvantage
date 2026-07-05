@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { typeLabel, rawLabel, entryLabel, relabel, esc } from './labels';
+import { typeLabel, rawLabel, entryLabel, relabel, escapeHtml } from './labels';
 import type { Dungeon } from '../model/types';
 
 describe('contents-key labels', () => {
@@ -10,14 +10,14 @@ describe('contents-key labels', () => {
 
   it('labels a corridor as secret only when on the secret floor', () => {
     const dungeon = { secretFloor: [[0], [1]] } as unknown as Dungeon;
-    expect(rawLabel(dungeon, { o: { x: 0, y: 0 }, kind: 'corridor' })).toBe('Corridor');
-    expect(rawLabel(dungeon, { o: { x: 0, y: 1 }, kind: 'corridor' })).toBe('Secret Passage');
+    expect(rawLabel(dungeon, { feature: { x: 0, y: 0 }, kind: 'corridor' })).toBe('Corridor');
+    expect(rawLabel(dungeon, { feature: { x: 0, y: 1 }, kind: 'corridor' })).toBe('Secret Passage');
   });
 
   it('prefers a user label over the default', () => {
     const dungeon = {} as Dungeon;
-    expect(entryLabel(dungeon, { o: { label: 'The Vault', type: 'treasure' }, kind: 'marker' })).toBe('The Vault');
-    expect(entryLabel(dungeon, { o: { type: 'treasure' }, kind: 'marker' })).toBe('Treasure');
+    expect(entryLabel(dungeon, { feature: { label: 'The Vault', type: 'treasure' }, kind: 'marker' })).toBe('The Vault');
+    expect(entryLabel(dungeon, { feature: { type: 'treasure' }, kind: 'marker' })).toBe('Treasure');
   });
 
   it('collects annotated features in sequence order and assigns letters', () => {
@@ -28,17 +28,17 @@ describe('contents-key labels', () => {
       corridorNotes: [],
     } as unknown as Dungeon;
     const entries = relabel(dungeon);
-    expect(entries.map((e) => e.o.ref)).toEqual(['A', 'B']);
-    expect(entries[0].o.note).toBe('a'); // seq 1 sorts first
+    expect(entries.map((e) => e.feature.ref)).toEqual(['A', 'B']);
+    expect(entries[0].feature.note).toBe('a'); // seq 1 sorts first
     expect(dungeon._seq).toBe(3);
   });
 
   it('escapes HTML-significant characters (XSS guard)', () => {
-    expect(esc('<img src=x onerror=alert(1)>')).toBe('&lt;img src=x onerror=alert(1)&gt;');
-    expect(esc('a & b')).toBe('a &amp; b');
+    expect(escapeHtml('<img src=x onerror=alert(1)>')).toBe('&lt;img src=x onerror=alert(1)&gt;');
+    expect(escapeHtml('a & b')).toBe('a &amp; b');
   });
 
   it('escapes quotes for attribute-context safety', () => {
-    expect(esc('"double" and \'single\'')).toBe('&quot;double&quot; and &#39;single&#39;');
+    expect(escapeHtml('"double" and \'single\'')).toBe('&quot;double&quot; and &#39;single&#39;');
   });
 });
