@@ -21,7 +21,14 @@ import { attachKeyboardEditController } from './controllers/keyboardEditControll
 import { attachNoteModalController } from './controllers/noteModalController';
 import type { ControllerContext, ModeState } from './controllers/types';
 
-export function initDungeon(): void {
+export interface InitDungeonOptions {
+  /** Invoked after the Contents Key rebuilds its pages, so the page-scaling
+      layer can re-fit them (a typed signal, not a synthetic resize event). */
+  onContentsKeyLayoutChange?: () => void;
+}
+
+export function initDungeon(options: InitDungeonOptions = {}): void {
+  const { onContentsKeyLayoutChange } = options;
   const history = new History();
   const store = new DungeonStore(history, window.localStorage);
   const editor = createDungeonEditor(store, history);
@@ -32,7 +39,7 @@ export function initDungeon(): void {
     if (!dungeon) return;
     const annotations = relabel(dungeon);
     renderDungeon(dungeon);
-    renderContentsKey(annotations, dungeon);
+    renderContentsKey(annotations, dungeon, onContentsKeyLayoutChange);
   });
 
   // Re-paginate the Contents Key when the layout width changes: the responsive
@@ -40,7 +47,7 @@ export function initDungeon(): void {
   // depends on --page-h).
   function repaginateContentsKey(): void {
     const dungeon = store.getCurrent();
-    if (dungeon) renderContentsKey(relabel(dungeon), dungeon);
+    if (dungeon) renderContentsKey(relabel(dungeon), dungeon, onContentsKeyLayoutChange);
   }
   watchContentsKeyBreakpoint(repaginateContentsKey);
   window.addEventListener('chronicle:pagesizechange', repaginateContentsKey);

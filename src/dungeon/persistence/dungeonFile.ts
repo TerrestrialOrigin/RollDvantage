@@ -9,9 +9,14 @@
    schema and stamps the file version — so nothing past this boundary ever sees
    a malformed or legacy shape.
    ============================================================ */
-import type { Dungeon, SecretPath, LegacySecretPath } from '../model/types';
+import type { Dungeon, ExternalDungeon, SecretPath, LegacySecretPath } from '../model/types';
 
 export const DUNGEON_SCHEMA_VERSION = 1;
+
+/** How long a download's object URL stays alive after the click — long enough
+    for the browser to begin the download; there is no observable "download
+    started" condition to wait on, so this stays a timer by design. */
+const OBJECT_URL_REVOKE_DELAY_MS = 1500;
 
 export class InvalidDungeonFileError extends Error {
   constructor() {
@@ -20,9 +25,15 @@ export class InvalidDungeonFileError extends Error {
   }
 }
 
-/** Pretty-printed JSON, exactly as the original Save produced. */
+/** Pretty-printed JSON, exactly as the original Save produced. The internal
+    grid maps back to the external `gw`/`gh` schema so files stay byte-
+    compatible with earlier builds (spread keeps every key in its position). */
 export function serializeDungeon(dungeon: Dungeon): string {
-  return JSON.stringify(dungeon, null, 2);
+  const external: ExternalDungeon = {
+    ...dungeon,
+    grid: { gw: dungeon.grid.width, gh: dungeon.grid.height, cell: dungeon.grid.cell },
+  };
+  return JSON.stringify(external, null, 2);
 }
 
 /** `<name-slug>-<SEED-hex>.dungeon`, matching the original filename scheme. */
@@ -92,11 +103,12 @@ function hasValidOptionalFields(candidate: Record<string, unknown>, rows: number
 }
 
 /**
- * Structural validation of untrusted input. Verifies everything editing and
- * rendering rely on: finite seed/grid numbers, a grid-shaped numeric floor,
- * and correctly-shaped feature arrays (secret paths in either schema).
+ * Structural validation of untrusted input (the external `gw`/`gh` schema —
+ * `migrateDungeon` maps it to the internal shape). Verifies everything editing
+ * and rendering rely on: finite seed/grid numbers, a grid-shaped numeric
+ * floor, and correctly-shaped feature arrays (secret paths in either schema).
  */
-export function isValidDungeon(value: unknown): value is Dungeon {
+export function isValidDungeon(value: unknown): value is ExternalDungeon {
   if (!isRecord(value)) return false;
   if (!isFiniteNumber(value.seed)) return false;
   if (!hasValidGrid(value)) return false;
@@ -122,18 +134,21 @@ function legacyPathToSegments(path: LegacySecretPath): SecretPath[] {
 }
 
 /**
- * Normalize a structurally valid dungeon to the current schema: legacy secret
- * paths become straight centerline segments, and the schema version is stamped.
- * Consumers past the load boundary may assume the modern shape.
+ * Normalize a structurally valid external dungeon to the internal schema:
+ * the abbreviated `gw`/`gh` grid becomes the full-name `Grid`, legacy secret
+ * paths become straight centerline segments, and the schema version is
+ * stamped. Consumers past the load boundary may assume the modern shape.
  */
-export function migrateDungeon(raw: Dungeon): Dungeon {
+export function migrateDungeon(raw: ExternalDungeon): Dungeon {
   const rawPaths = (raw.secretPaths ?? []) as unknown[];
   if (rawPaths.length > 0) {
     raw.secretPaths = rawPaths.flatMap((path) =>
       isModernSecretPath(path) ? [path] : legacyPathToSegments(path as LegacySecretPath));
   }
   raw.version = DUNGEON_SCHEMA_VERSION;
-  return raw;
+  const dungeon = raw as unknown as Dungeon;
+  dungeon.grid = { width: raw.grid.gw, height: raw.grid.gh, cell: raw.grid.cell };
+  return dungeon;
 }
 
 /** Parse + validate + migrate dungeon JSON. Throws InvalidDungeonFileError on bad input. */
@@ -159,7 +174,7 @@ export function downloadDungeon(dungeon: Dungeon): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  setTimeout(() => { URL.revokeObjectURL(url); }, 1500);
+  setTimeout(() => { URL.revokeObjectURL(url); }, OBJECT_URL_REVOKE_DELAY_MS);
 }
 
 /** Read + parse + validate a File. Rejects with InvalidDungeonFileError on bad input. */

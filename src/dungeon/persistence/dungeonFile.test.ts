@@ -1,10 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { generateDungeon } from 'auto-stuff-generator';
 import { serializeDungeon, dungeonFilename, parseDungeonText, isValidDungeon, migrateDungeon, DUNGEON_SCHEMA_VERSION, InvalidDungeonFileError } from './dungeonFile';
-import type { Dungeon } from '../model/types';
+import type { Dungeon, ExternalDungeon } from '../model/types';
 
-function generated(mode: 'empty' | 'full' | 'detailed' = 'full'): Dungeon {
-  return JSON.parse(JSON.stringify(generateDungeon(42, 2, mode))) as Dungeon;
+/** Raw generator output — the external schema (`grid.gw/gh`), pre-adoption. */
+function generated(mode: 'empty' | 'full' | 'detailed' = 'full'): ExternalDungeon {
+  return JSON.parse(JSON.stringify(generateDungeon(42, 2, mode))) as ExternalDungeon;
+}
+
+/** Generator output taken through the adoption boundary (internal schema). */
+function adopted(mode: 'empty' | 'full' | 'detailed' = 'full'): Dungeon {
+  return migrateDungeon(generated(mode));
 }
 
 /** A minimal hand-built current-schema dungeon that must always validate. */
@@ -43,16 +51,25 @@ function legacyDungeon(): Record<string, unknown> {
 }
 
 describe('dungeon file persistence (pure core)', () => {
-  it('round-trips a dungeon through serialize → parse, gaining only the version stamp', () => {
-    const dungeon = generated();
-    const restored = parseDungeonText(serializeDungeon(dungeon));
-    expect(restored).toEqual({ ...dungeon, version: DUNGEON_SCHEMA_VERSION });
-  });
-
-  it('round-trips an already-stamped dungeon completely unchanged', () => {
-    const dungeon = { ...generated(), version: DUNGEON_SCHEMA_VERSION };
+  it('round-trips a dungeon through serialize → parse completely unchanged', () => {
+    const dungeon = adopted();   // adoption already stamps the version
     const restored = parseDungeonText(serializeDungeon(dungeon));
     expect(restored).toEqual(dungeon);
+  });
+
+  it('serializes the internal grid back to the external gw/gh schema', () => {
+    const emitted = serializeDungeon(adopted());
+    expect(emitted).toMatch(/"gw":/);
+    expect(emitted).toMatch(/"gh":/);
+    expect(emitted).not.toMatch(/"width":/);
+    expect(emitted).not.toMatch(/"height":/);
+  });
+
+  it('round-trips the committed E2E fixture byte-for-byte (gw/gh adapter is serialization-neutral)', () => {
+    const fixtureText = readFileSync(join(__dirname, '../../../e2e/fixtures/seed-c0ffee.dungeon'), 'utf8');
+    const loaded = parseDungeonText(fixtureText);
+    expect(loaded.grid).toEqual({ width: 23, height: 25, cell: 24 });
+    expect(serializeDungeon(loaded)).toBe(fixtureText.trimEnd());
   });
 
   it('builds a slug-and-seed filename', () => {
@@ -111,19 +128,19 @@ describe('structural validation (H4/M3)', () => {
 
 describe('legacy migration (H4)', () => {
   it('migrates a straight legacy path to a single modern segment and stamps the version', () => {
-    const migrated = migrateDungeon(JSON.parse(JSON.stringify(legacyDungeon())) as Dungeon);
+    const migrated = migrateDungeon(JSON.parse(JSON.stringify(legacyDungeon())) as ExternalDungeon);
     expect(migrated.version).toBe(DUNGEON_SCHEMA_VERSION);
     expect(migrated.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]);
   });
 
   it('splits an L-shaped legacy path into one modern segment per leg', () => {
     const base = legacyDungeon();
-    const horizFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: true }] } as unknown as Dungeon);
+    const horizFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: true }] } as unknown as ExternalDungeon);
     expect(horizFirst.secretPaths).toEqual([
       { x1: 0, y1: 0, x2: 2, y2: 0 }, // horizontal leg first
       { x1: 2, y1: 0, x2: 2, y2: 2 }, // then vertical leg
     ]);
-    const vertFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: false }] } as unknown as Dungeon);
+    const vertFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: false }] } as unknown as ExternalDungeon);
     expect(vertFirst.secretPaths).toEqual([
       { x1: 0, y1: 0, x2: 0, y2: 2 }, // vertical leg first
       { x1: 0, y1: 2, x2: 2, y2: 2 }, // then horizontal leg
@@ -132,7 +149,7 @@ describe('legacy migration (H4)', () => {
 
   it('passes modern paths through unchanged', () => {
     const modern = { ...legacyDungeon(), secretPaths: [{ x1: 1, y1: 3, x2: 3, y2: 3 }] };
-    const migrated = migrateDungeon(JSON.parse(JSON.stringify(modern)) as Dungeon);
+    const migrated = migrateDungeon(JSON.parse(JSON.stringify(modern)) as ExternalDungeon);
     expect(migrated.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]);
   });
 

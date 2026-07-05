@@ -23,7 +23,10 @@ export type GenerationMode = 'empty' | 'full' | 'detailed';
 /** A 32-bit seed source. Defaults to Math.random; injectable for determinism. */
 export type SeedSource = () => number;
 
-const randomSeed: SeedSource = () => (Math.random() * 0xffffffff) >>> 0;
+/** Upper bound of the random seed range (the largest unsigned 32-bit value). */
+const MAX_SEED = 0xffffffff;
+
+const randomSeed: SeedSource = () => (Math.random() * MAX_SEED) >>> 0;
 
 export interface DungeonEditor {
   generate(mode?: GenerationMode, seed?: number): void;
@@ -32,9 +35,9 @@ export interface DungeonEditor {
   moveMarker(index: number, x: number, y: number): void;
   deleteMarker(index: number): void;
   retypeMarker(index: number, type: MarkerType): void;
-  addRoom(x0: number, y0: number, x1: number, y1: number): void;
-  addCorridor(ax: number, ay: number, bx: number, by: number): void;
-  deleteRegion(x0: number, y0: number, x1: number, y1: number): void;
+  addRoom(startX: number, startY: number, endX: number, endY: number): void;
+  addCorridor(startX: number, startY: number, endX: number, endY: number): void;
+  deleteRegion(startX: number, startY: number, endX: number, endY: number): void;
   makeSecret(x: number, y: number): void;
   unmakeSecret(x: number, y: number): void;
   setNote(target: Annotatable, list: Annotatable[] | null, noteText: string, labelText: string): 'saved' | 'removed';
@@ -102,9 +105,9 @@ export function createDungeonEditor(store: DungeonStore, history: History, seedS
       });
     },
 
-    addRoom(x0, y0, x1, y1): void { edit((dungeon) => commitRoom(dungeon, x0, y0, x1, y1)); },
-    addCorridor(ax, ay, bx, by): void { edit((dungeon) => commitCorridor(dungeon, ax, ay, bx, by)); },
-    deleteRegion(x0, y0, x1, y1): void { edit((dungeon) => commitDelete(dungeon, x0, y0, x1, y1)); },
+    addRoom(startX, startY, endX, endY): void { edit((dungeon) => commitRoom(dungeon, startX, startY, endX, endY)); },
+    addCorridor(startX, startY, endX, endY): void { edit((dungeon) => commitCorridor(dungeon, startX, startY, endX, endY)); },
+    deleteRegion(startX, startY, endX, endY): void { edit((dungeon) => commitDelete(dungeon, startX, startY, endX, endY)); },
     makeSecret(x, y): void { edit((dungeon) => convertSecretAt(dungeon, x, y)); },
     unmakeSecret(x, y): void { edit((dungeon) => unconvertSecret(dungeon, x, y)); },
 

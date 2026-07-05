@@ -11,8 +11,8 @@ import { FLOOR, GRID, WALL, INK, GOLD, SECRET_FILL } from './palette';
 import { triangle, refBadge, symbol } from './symbols';
 
 export function buildSVG(dungeon: Dungeon, options: RenderOptions): string {
-  const gridWidth = dungeon.grid.gw;
-  const gridHeight = dungeon.grid.gh;
+  const gridWidth = dungeon.grid.width;
+  const gridHeight = dungeon.grid.height;
   const cell = dungeon.grid.cell;
   const base = dungeon.floor;
   const secretFloor: FloorGrid | null = options.secret && dungeon.secretFloor ? dungeon.secretFloor : null;
@@ -34,9 +34,9 @@ export function buildSVG(dungeon: Dungeon, options: RenderOptions): string {
   }
   // secret floor (DM only) — faint gold tint
   if (secretFloor) {
-    for (let gy = 0; gy < gridHeight; gy++) for (let gx = 0; gx < gridWidth; gx++) {
-      if (secretFloor[gy][gx] === 1 && base[gy][gx] !== 1)
-        rects += '<rect x="' + (gx * cell) + '" y="' + (gy * cell) + '" width="' + cell + '" height="' + cell + '" fill="' + SECRET_FILL + '" stroke="' + GRID + '" stroke-width="0.5"/>';
+    for (let gridY = 0; gridY < gridHeight; gridY++) for (let gridX = 0; gridX < gridWidth; gridX++) {
+      if (secretFloor[gridY][gridX] === 1 && base[gridY][gridX] !== 1)
+        rects += '<rect x="' + (gridX * cell) + '" y="' + (gridY * cell) + '" width="' + cell + '" height="' + cell + '" fill="' + SECRET_FILL + '" stroke="' + GRID + '" stroke-width="0.5"/>';
     }
   }
   svg += '<g class="floor">' + rects + '</g>';
@@ -45,11 +45,11 @@ export function buildSVG(dungeon: Dungeon, options: RenderOptions): string {
   let wallPath = '';
   for (let y = 0; y < gridHeight; y++) for (let x = 0; x < gridWidth; x++) {
     if (!isEffectiveFloor(x, y)) continue;
-    const px = x * cell, py = y * cell;
-    if (!isEffectiveFloor(x, y - 1)) wallPath += 'M' + px + ' ' + py + 'h' + cell;
-    if (!isEffectiveFloor(x, y + 1)) wallPath += 'M' + px + ' ' + (py + cell) + 'h' + cell;
-    if (!isEffectiveFloor(x - 1, y)) wallPath += 'M' + px + ' ' + py + 'v' + cell;
-    if (!isEffectiveFloor(x + 1, y)) wallPath += 'M' + (px + cell) + ' ' + py + 'v' + cell;
+    const pixelX = x * cell, pixelY = y * cell;
+    if (!isEffectiveFloor(x, y - 1)) wallPath += 'M' + pixelX + ' ' + pixelY + 'h' + cell;
+    if (!isEffectiveFloor(x, y + 1)) wallPath += 'M' + pixelX + ' ' + (pixelY + cell) + 'h' + cell;
+    if (!isEffectiveFloor(x - 1, y)) wallPath += 'M' + pixelX + ' ' + pixelY + 'v' + cell;
+    if (!isEffectiveFloor(x + 1, y)) wallPath += 'M' + (pixelX + cell) + ' ' + pixelY + 'v' + cell;
   }
   svg += '<path class="walls" d="' + wallPath + '" fill="none" stroke="' + WALL + '" stroke-width="2.4" stroke-linecap="square"/>';
 

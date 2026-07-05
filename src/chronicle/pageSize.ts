@@ -8,13 +8,14 @@
    ============================================================ */
 
 export type Unit = 'in' | 'mm';
-export interface PageSize { w: number; h: number; unit: Unit; }
+export interface PageSize { width: number; height: number; unit: Unit; }
 
-/** Common presets. Custom sizes are stored the same shape. */
+/** Common presets. Persisted sizes use the compact legacy `{w,h,unit}` shape —
+    see loadPersisted/savePersisted, the only places that shape exists. */
 export const PRESETS: Record<string, PageSize> = {
-  letter: { w: 8.5, h: 11, unit: 'in' },
-  a4: { w: 210, h: 297, unit: 'mm' },
-  legal: { w: 8.5, h: 14, unit: 'in' },
+  letter: { width: 8.5, height: 11, unit: 'in' },
+  a4: { width: 210, height: 297, unit: 'mm' },
+  legal: { width: 8.5, height: 14, unit: 'in' },
 };
 
 const MIN_INCHES = 3;
@@ -45,10 +46,10 @@ export function validateDimension(value: unknown, unit: Unit): number | null {
 
 /** Validate a full custom size; null if either dimension is unusable. */
 export function validateCustom(width: unknown, height: unknown, unit: Unit): PageSize | null {
-  const w = validateDimension(width, unit);
-  const h = validateDimension(height, unit);
-  if (w === null || h === null) return null;
-  return { w, h, unit };
+  const validWidth = validateDimension(width, unit);
+  const validHeight = validateDimension(height, unit);
+  if (validWidth === null || validHeight === null) return null;
+  return { width: validWidth, height: validHeight, unit };
 }
 
 /** Letter for US/Canada locales, A4 otherwise. */
@@ -58,7 +59,9 @@ export function defaultForLocale(locale: string): PageSize {
 
 function storageKey(prefix: string): string { return prefix + 'pageSize'; }
 
-/** Read a persisted size, defensively — corrupt/invalid values yield null. */
+/** Read a persisted size, defensively — corrupt/invalid values yield null.
+    The stored payload keeps the legacy compact `{w,h,unit}` keys so sizes
+    saved before the width/height rename still restore. */
 export function loadPersisted(prefix: string): PageSize | null {
   try {
     const raw = localStorage.getItem(storageKey(prefix));
@@ -73,7 +76,8 @@ export function loadPersisted(prefix: string): PageSize | null {
 }
 
 export function savePersisted(prefix: string, size: PageSize): void {
-  try { localStorage.setItem(storageKey(prefix), JSON.stringify(size)); } catch { /* storage unavailable */ }
+  const stored = { w: size.width, h: size.height, unit: size.unit };   // legacy storage shape, byte-compatible
+  try { localStorage.setItem(storageKey(prefix), JSON.stringify(stored)); } catch { /* storage unavailable */ }
 }
 
 /** Resolution order: persisted → locale heuristic → Letter. */
@@ -84,8 +88,8 @@ export function resolveInitial(prefix: string, locale: string): PageSize {
 /** Write the size to the CSS variables that drive all geometry + `@page`. */
 export function applyPageSize(size: PageSize): void {
   const root = document.documentElement;
-  root.style.setProperty('--page-w', `${size.w}${size.unit}`);
-  root.style.setProperty('--page-h', `${size.h}${size.unit}`);
+  root.style.setProperty('--page-w', `${size.width}${size.unit}`);
+  root.style.setProperty('--page-h', `${size.height}${size.unit}`);
 }
 
 export interface PageSizeController {

@@ -1,7 +1,13 @@
+/* dungeon.css must precede chronicle.css: it replaced the inline <style> block
+   that the bundled stylesheet historically followed, so chronicle.css keeps
+   winning equal-specificity ties (e.g. `.toolbar` positioning). */
+import './styles/dungeon.css';
 import './styles/chronicle.css';
 import { initDungeon } from './dungeon/initDungeon';
 import { initChronicle } from './chronicle/initChronicle';
 import { setupPageSize } from './chronicle/pageSize';
+import { fit as fitChroniclePages } from './chronicle/pageScaling';
+import { attachToolbarMenuController } from './dungeon/controllers/toolbarMenuController';
 
 /* The original page loaded these as classic <script> tags placed at the
    bottom of <body>. With Vite + ES modules the entry runs after the DOM
@@ -11,8 +17,11 @@ function boot(): void {
   // Resolve + apply the page geometry BEFORE anything renders, so maps and the
   // Contents Key are laid out at the correct size from the first paint.
   const pageSize = setupPageSize('dungeon_');
-  initDungeon();
+  // fit() no-ops until initChronicle wraps the pages, matching the old
+  // synthetic-resize signal that had no listener during the initial render.
+  initDungeon({ onContentsKeyLayoutChange: fitChroniclePages });
   initChronicle('dungeon_', pageSize);
+  attachToolbarMenuController();
 }
 
 if (document.readyState === 'loading') {

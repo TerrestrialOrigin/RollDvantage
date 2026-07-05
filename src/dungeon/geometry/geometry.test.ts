@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { cellFromClient, cellClamped, edgeDir, corridorCells } from './grid';
-import { straightRunF, isCorridorCell, roomIndexAt } from './topology';
+import { straightRunWhere, isCorridorCell, roomIndexAt } from './topology';
 import type { Dungeon, Grid } from '../model/types';
 
-const grid: Grid = { gw: 10, gh: 8, cell: 20 };
+const grid: Grid = { width: 10, height: 8, cell: 20 };
 const rect = { left: 0, top: 0, width: 200, height: 160, right: 200, bottom: 160 } as DOMRect;
 
 describe('grid geometry', () => {
@@ -34,7 +34,7 @@ describe('straight run', () => {
   it('stops a horizontal run at a turn', () => {
     // a 3-long horizontal segment of "corridor" cells
     const present = new Set(['1,1', '2,1', '3,1']);
-    const run = straightRunF(2, 1, (x, y) => present.has(`${x},${y}`));
+    const run = straightRunWhere(2, 1, (x, y) => present.has(`${x},${y}`));
     expect(run.horiz).toBe(true);
     expect(run.cells.length).toBe(3);
   });

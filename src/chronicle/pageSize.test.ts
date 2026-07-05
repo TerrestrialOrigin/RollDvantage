@@ -46,7 +46,7 @@ describe('validateDimension', () => {
 
 describe('validateCustom', () => {
   it('returns a size when both dimensions are valid', () => {
-    expect(validateCustom(7, 9, 'in')).toEqual({ w: 7, h: 9, unit: 'in' });
+    expect(validateCustom(7, 9, 'in')).toEqual({ width: 7, height: 9, unit: 'in' });
   });
   it('returns null when either dimension is invalid', () => {
     expect(validateCustom(0, 9, 'in')).toBeNull();
@@ -67,8 +67,16 @@ describe('defaultForLocale', () => {
 
 describe('persistence', () => {
   it('round-trips a saved size', () => {
-    savePersisted(PREFIX, { w: 210, h: 297, unit: 'mm' });
-    expect(loadPersisted(PREFIX)).toEqual({ w: 210, h: 297, unit: 'mm' });
+    savePersisted(PREFIX, { width: 210, height: 297, unit: 'mm' });
+    expect(loadPersisted(PREFIX)).toEqual({ width: 210, height: 297, unit: 'mm' });
+  });
+  it('restores a payload stored before the width/height rename (legacy {w,h,unit} keys)', () => {
+    localStorage.setItem(PREFIX + 'pageSize', JSON.stringify({ w: 8.5, h: 14, unit: 'in' }));
+    expect(loadPersisted(PREFIX)).toEqual({ width: 8.5, height: 14, unit: 'in' });
+  });
+  it('keeps writing the legacy storage shape so older builds can read it back', () => {
+    savePersisted(PREFIX, { width: 8.5, height: 11, unit: 'in' });
+    expect(JSON.parse(localStorage.getItem(PREFIX + 'pageSize')!)).toEqual({ w: 8.5, h: 11, unit: 'in' });
   });
   it('returns null for a missing value', () => {
     expect(loadPersisted(PREFIX)).toBeNull();
@@ -96,7 +104,7 @@ describe('resolveInitial', () => {
 
 describe('applyPageSize', () => {
   it('writes validated numbers + fixed unit to the CSS variables', () => {
-    applyPageSize({ w: 210, h: 297, unit: 'mm' });
+    applyPageSize({ width: 210, height: 297, unit: 'mm' });
     expect(document.documentElement.style.getPropertyValue('--page-w')).toBe('210mm');
     expect(document.documentElement.style.getPropertyValue('--page-h')).toBe('297mm');
   });
