@@ -21,6 +21,7 @@ export function roomIndexAt(dungeon: Dungeon, x: number, y: number): number {
   const rooms = dungeon.rooms || [];
   for (let i = 0; i < rooms.length; i++) {
     const room = rooms[i];
+    if (!room) continue;
     if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return i;
   }
   return -1;
@@ -34,6 +35,7 @@ export function secretRoomIndexAt(dungeon: Dungeon, x: number, y: number): numbe
   const secretRooms = dungeon.secretRooms ?? [];
   for (let i = 0; i < secretRooms.length; i++) {
     const room = secretRooms[i];
+    if (!room) continue;
     if (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) return i;
   }
   return -1;

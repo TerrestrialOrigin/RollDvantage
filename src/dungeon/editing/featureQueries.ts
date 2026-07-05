@@ -21,13 +21,13 @@ const ANNOTATABLE: Record<string, boolean> = { monster: true, boss: true, treasu
 
 /** Index of the topmost marker exactly at (x,y), or -1. */
 export function markerAtCell(dungeon: Dungeon, x: number, y: number): number {
-  for (let i = dungeon.markers.length - 1; i >= 0; i--) { const marker = dungeon.markers[i]; if (marker.x === x && marker.y === y) return i; }
+  for (let i = dungeon.markers.length - 1; i >= 0; i--) { const marker = dungeon.markers[i]; if (!marker) continue; if (marker.x === x && marker.y === y) return i; }
   return -1;
 }
 
 /** The topmost annotatable (non-entrance/exit) marker at (x,y), or null. */
 export function annotatableMarkerAt(dungeon: Dungeon, x: number, y: number): Marker | null {
-  for (let i = dungeon.markers.length - 1; i >= 0; i--) { const marker = dungeon.markers[i]; if (marker.x === x && marker.y === y && ANNOTATABLE[marker.type]) return marker; }
+  for (let i = dungeon.markers.length - 1; i >= 0; i--) { const marker = dungeon.markers[i]; if (!marker) continue; if (marker.x === x && marker.y === y && ANNOTATABLE[marker.type]) return marker; }
   return null;
 }
 
@@ -43,8 +43,11 @@ export function roomAt(dungeon: Dungeon, x: number, y: number): { feature: Room;
 /** Classify whatever feature occupies (x,y). */
 export function featureAt(dungeon: Dungeon, x: number, y: number): Feature | null {
   const markerIndex = markerAtCell(dungeon, x, y);
-  if (markerIndex >= 0 && dungeon.markers[markerIndex].type !== 'secret') return { kind: 'marker', index: markerIndex, marker: dungeon.markers[markerIndex] };
-  const roomIndex = roomIndexAt(dungeon, x, y); if (roomIndex >= 0) return { kind: 'room', room: dungeon.rooms[roomIndex] };
+  const topMarker = markerIndex >= 0 ? dungeon.markers[markerIndex] : undefined;
+  if (topMarker && topMarker.type !== 'secret') return { kind: 'marker', index: markerIndex, marker: topMarker };
+  const roomIndex = roomIndexAt(dungeon, x, y);
+  const room = roomIndex >= 0 ? dungeon.rooms[roomIndex] : undefined;
+  if (room) return { kind: 'room', room };
   const secretIndex = secretRoomIndexAt(dungeon, x, y);
   const secretRoom = secretIndex >= 0 ? (dungeon.secretRooms ?? [])[secretIndex] : undefined;
   if (secretRoom) return { kind: 'secret-room', room: secretRoom };

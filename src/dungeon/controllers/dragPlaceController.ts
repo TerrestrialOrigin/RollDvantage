@@ -84,7 +84,7 @@ export function attachDragPlaceController(context: ControllerContext): DragPlace
         if (marker.type === 'secret') {
           // the (S) badge IS the secret status — dragging it MOVES the secret.
           const originX = marker.x, originY = marker.y;
-          const alreadySecret = !!dungeon.secretFloor && !!dungeon.secretFloor[cell.y] && dungeon.secretFloor[cell.y][cell.x] === 1;
+          const alreadySecret = dungeon.secretFloor?.[cell.y]?.[cell.x] === 1;
           const canConvert = !alreadySecret && (roomIndexAt(dungeon, cell.x, cell.y) >= 0 || isCorridorCell(dungeon, cell.x, cell.y));
           if (canConvert) {
             editor.unmakeSecret(originX, originY); // restore the old room/passage
@@ -133,8 +133,9 @@ export function attachDragPlaceController(context: ControllerContext): DragPlace
       const svg = dmSvg(); if (!svg || !dungeon) return;
       const cell = cellAtClient(dungeon, pointerEvent.clientX, pointerEvent.clientY); if (!cell?.inside) return;
       const index = markerAtCell(dungeon, cell.x, cell.y);
-      if (index < 0) return;                      // empty square — leave it alone
-      startDrag({ mode: 'move', type: dungeon.markers[index].type, index }, pointerEvent);
+      const marker = dungeon.markers[index];
+      if (index < 0 || !marker) return;           // empty square — leave it alone
+      startDrag({ mode: 'move', type: marker.type, index }, pointerEvent);
     });
   }
 

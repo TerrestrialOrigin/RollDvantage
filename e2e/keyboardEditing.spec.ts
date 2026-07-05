@@ -29,12 +29,12 @@ interface GridInfo {
 }
 async function readGrid(page: Page): Promise<GridInfo> {
   return page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
     const viewBox = svg.viewBox.baseVal;
-    const firstFloorRect = svg.querySelector('.floor rect') as SVGRectElement;
+    const firstFloorRect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const cell = parseFloat(firstFloorRect.getAttribute('width')!);
     const floorCells: string[] = [];
-    svg.querySelectorAll('.floor rect').forEach((rect) => {
+    svg.querySelectorAll<SVGRectElement>('.floor rect').forEach((rect) => {
       const cellX = Math.round(parseFloat(rect.getAttribute('x')!) / cell);
       const cellY = Math.round(parseFloat(rect.getAttribute('y')!) / cell);
       floorCells.push(cellX + ',' + cellY);
@@ -46,8 +46,8 @@ async function readGrid(page: Page): Promise<GridInfo> {
 /** Current keyboard-cursor grid position, read from the live cursor rect. */
 async function cursorPosition(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
-    const rect = svg.querySelector('#kbd-cursor rect') as SVGRectElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const rect = svg.querySelector('#kbd-cursor rect')!;
     const cell = parseFloat(rect.getAttribute('width')!);
     return { x: Math.round(parseFloat(rect.getAttribute('x')!) / cell), y: Math.round(parseFloat(rect.getAttribute('y')!) / cell) };
   });
@@ -68,8 +68,8 @@ async function moveCursorTo(page: Page, targetX: number, targetY: number): Promi
     coordinates in, so occupancy is derived from each glyph's bbox center. */
 async function findPlaceableCell(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
-    const firstFloorRect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const firstFloorRect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const cell = parseFloat(firstFloorRect.getAttribute('width')!);
     const occupied = new Set<string>();
     svg.querySelectorAll('g.mk').forEach((marker) => {
@@ -77,7 +77,7 @@ async function findPlaceableCell(page: Page): Promise<{ x: number; y: number }> 
       const centerX = box.x + box.width / 2, centerY = box.y + box.height / 2;
       occupied.add(Math.floor(centerX / cell) + ',' + Math.floor(centerY / cell));
     });
-    const floorRects = Array.from(svg.querySelectorAll('.floor rect')) as SVGRectElement[];
+    const floorRects = Array.from(svg.querySelectorAll<SVGRectElement>('.floor rect'));
     for (const rect of floorRects) {
       const cellX = Math.round(parseFloat(rect.getAttribute('x')!) / cell);
       const cellY = Math.round(parseFloat(rect.getAttribute('y')!) / cell);

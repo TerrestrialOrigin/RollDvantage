@@ -39,8 +39,8 @@ async function loadPrinted(page) {
 }
 function pageCount(pdf) { return (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length; }
 function mediaBox(pdf) {
-  const m = pdf.toString('latin1').match(/MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)/);
-  return m ? [Math.round(+m[1]), Math.round(+m[2])] : null;
+  const mediaBoxMatch = pdf.toString('latin1').match(/MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)/);
+  return mediaBoxMatch ? [Math.round(+mediaBoxMatch[1]), Math.round(+mediaBoxMatch[2])] : null;
 }
 
 async function chromiumChecks() {
@@ -68,7 +68,7 @@ async function firefoxChecks() {
   await loadPrinted(page);
   const sections = await page.locator('.page').count();
   await page.evaluate(() => window.print());
-  for (let i = 0; i < 60 && !(existsSync(out) && statSync(out).size > 0); i++) await new Promise((r) => setTimeout(r, 200));
+  for (let i = 0; i < 60 && !(existsSync(out) && statSync(out).size > 0); i++) await new Promise((resolve) => setTimeout(resolve, 200));
   await browser.close();
   if (!existsSync(out)) { record('Firefox: produced a print PDF', false, 'no file'); return; }
 
@@ -82,8 +82,8 @@ async function firefoxChecks() {
   record('Firefox: header stacked (depth over name)', /depth/i.test(depthLine) && !/mansion/i.test(depthLine), JSON.stringify(depthLine.trim()));
   // full-page border present: content reaches within ~0.7in of every sheet edge
   execSync(`pdftoppm -png -r 70 -f 1 -l 1 "${out}" "${TMP}/ff"`);
-  const margins = execSync(`python3 - "${TMP}/ff-1.png" <<'PY'\nimport sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert('RGB'); w,h=im.size; px=im.load()\ndef nw(c): r,g,b=c; return not(r>238 and g>238 and b>238)\nminx=w;miny=h;maxx=0;maxy=0\nfor y in range(h):\n  for x in range(0,w,2):\n    if nw(px[x,y]): minx=min(minx,x);maxx=max(maxx,x);miny=min(miny,y);maxy=max(maxy,y)\nprint('%.2f %.2f %.2f %.2f'%(minx/70,miny/70,(w-maxx)/70,(h-maxy)/70))\nPY`).toString().trim().split(' ').map(Number);
-  const bordered = margins.every((m) => m > 0.15 && m < 0.9);
+  const margins = execSync(`python3 - "${TMP}/ff-1.png" <<'PY'\nimport sys\nfrom PIL import Image\nimage=Image.open(sys.argv[1]).convert('RGB'); width,height=image.size; pixels=image.load()\ndef isNonWhite(color): red,green,blue=color; return not(red>238 and green>238 and blue>238)\nminX=width;minY=height;maxX=0;maxY=0\nfor y in range(height):\n  for x in range(0,width,2):\n    if isNonWhite(pixels[x,y]): minX=min(minX,x);maxX=max(maxX,x);minY=min(minY,y);maxY=max(maxY,y)\nprint('%.2f %.2f %.2f %.2f'%(minX/70,minY/70,(width-maxX)/70,(height-maxY)/70))\nPY`).toString().trim().split(' ').map(Number);
+  const bordered = margins.every((margin) => margin > 0.15 && margin < 0.9);
   record('Firefox: full-page border with margins', bordered, `margins in: ${margins.join('/')}`);
 }
 
@@ -93,8 +93,8 @@ try {
   server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { cwd: REPO, stdio: 'ignore' });
   let up = false;
   for (let i = 0; i < 120; i++) {
-    try { const r = await fetch(BASE); if (r.ok) { up = true; break; } } catch { /* not ready */ }
-    await new Promise((r) => setTimeout(r, 500));
+    try { const response = await fetch(BASE); if (response.ok) { up = true; break; } } catch { /* not ready */ }
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   if (!up) throw new Error('dev server did not start');
   console.log('\nChromium print checks:');

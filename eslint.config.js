@@ -3,7 +3,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'capacitor.config.ts', 'android', 'ios', 'e2e', 'playwright.config.ts'] },
+  { ignores: ['dist', 'capacitor.config.ts', 'android', 'ios'] },
   {
     extends: [
       js.configs.recommended,
@@ -15,13 +15,9 @@ export default tseslint.config(
       ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        project: ['./tsconfig.node.json', './tsconfig.app.json', './tsconfig.e2e.json'],
         tsconfigRootDir: import.meta.dirname,
       },
-    },
-    rules: {
-      '@typescript-eslint/no-floating-promises': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 )

@@ -12,7 +12,7 @@ const inlineScriptHashes = (html: string): string[] => {
   const hashes: string[] = [];
   for (const scriptMatch of html.matchAll(inlineScriptPattern)) {
     const scriptContent = scriptMatch[1];
-    if (scriptContent.trim() === '') continue;
+    if (scriptContent === undefined || scriptContent.trim() === '') continue;
     const digest = createHash('sha256').update(scriptContent).digest('base64');
     hashes.push(`'sha256-${digest}'`);
   }
@@ -68,5 +68,21 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
     exclude: [...configDefaults.exclude, 'dist', 'e2e'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/**'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'src/test-setup.ts'],
+      reporter: ['text-summary'],
+      /* A regression floor set just below the current measured coverage — it
+         catches coverage sliding backward without being a target to chase.
+         Much of the UI/controller glue is covered by the Playwright E2E suite,
+         which this unit-coverage number does not see. Raise as gaps are filled. */
+      thresholds: {
+        statements: 50,
+        branches: 45,
+        functions: 52,
+        lines: 54,
+      },
+    },
   }
 })

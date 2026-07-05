@@ -12,7 +12,7 @@ export interface PageSize { width: number; height: number; unit: Unit; }
 
 /** Common presets. Persisted sizes use the compact legacy `{w,h,unit}` shape —
     see loadPersisted/savePersisted, the only places that shape exists. */
-export const PRESETS: Record<string, PageSize> = {
+export const PRESETS: Record<string, PageSize> & { letter: PageSize; a4: PageSize; legal: PageSize } = {
   letter: { width: 8.5, height: 11, unit: 'in' },
   a4: { width: 210, height: 297, unit: 'mm' },
   legal: { width: 8.5, height: 14, unit: 'in' },

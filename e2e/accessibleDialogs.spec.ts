@@ -26,9 +26,9 @@ test.beforeEach(async ({ page }) => {
 /** Grid dimensions read from the live page (no mocks). */
 async function gridSize(page: Page): Promise<{ gridWidth: number; gridHeight: number }> {
   return page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
     const viewBox = svg.viewBox.baseVal;
-    const firstFloorRect = svg.querySelector('.floor rect') as SVGRectElement;
+    const firstFloorRect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const cell = parseFloat(firstFloorRect.getAttribute('width')!);
     return { gridWidth: Math.round(viewBox.width / cell), gridHeight: Math.round(viewBox.height / cell) };
   });
@@ -37,8 +37,8 @@ async function gridSize(page: Page): Promise<{ gridWidth: number; gridHeight: nu
 /** Grid coordinates of the first floor cell — always an annotatable feature. */
 async function firstFloorCell(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
-    const rect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const rect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const cell = parseFloat(rect.getAttribute('width')!);
     return {
       x: Math.round(parseFloat(rect.getAttribute('x')!) / cell),
@@ -50,8 +50,8 @@ async function firstFloorCell(page: Page): Promise<{ x: number; y: number }> {
 /** Client-space center of the first floor cell, for pointer gestures. */
 async function firstFloorCellClientPoint(page: Page): Promise<{ x: number; y: number }> {
   return page.evaluate(() => {
-    const svg = document.querySelector('#dm-map svg') as SVGSVGElement;
-    const rect = svg.querySelector('.floor rect') as SVGRectElement;
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const rect = svg.querySelector<SVGRectElement>('.floor rect')!;
     const svgBox = svg.getBoundingClientRect();
     const viewBox = svg.viewBox.baseVal;
     const scaleX = svgBox.width / viewBox.width;
@@ -82,6 +82,9 @@ async function openNoteDialogByKeyboard(page: Page): Promise<void> {
 
 /** id (or tag) of the element that currently has focus. */
 async function focusedElementId(page: Page): Promise<string> {
+  // `||` (not `??`) is intentional: an element with an empty-string id must fall
+  // through to its tagName rather than resolving to ''.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   return page.evaluate(() => document.activeElement?.id || document.activeElement?.tagName || '');
 }
 
@@ -265,7 +268,7 @@ test('Contents-Key entry is a focusable button; Enter opens its dialog; close re
   const focusedIsMyBox = await page.evaluate(() =>
     document.activeElement instanceof HTMLElement
     && document.activeElement.classList.contains('ck-box')
-    && document.activeElement.textContent!.includes('Guarded by a sleeping troll'));
+    && document.activeElement.textContent.includes('Guarded by a sleeping troll'));
   expect(focusedIsMyBox).toBe(true);                           // opener regains focus
 });
 

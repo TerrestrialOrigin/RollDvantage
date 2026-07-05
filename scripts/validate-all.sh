@@ -49,8 +49,8 @@ echo "OK — auto-stuff-generator is a normal (published) dependency."
 step "rolldvantage — lint"
 ( cd "$CONSUMER_DIR" && npm run lint )
 
-step "rolldvantage — unit + integration tests"
-( cd "$CONSUMER_DIR" && npx vitest run )
+step "rolldvantage — unit + integration tests (with coverage threshold)"
+( cd "$CONSUMER_DIR" && npx vitest run --coverage )
 
 step "rolldvantage — web build"
 ( cd "$CONSUMER_DIR" && npm run build-web )
@@ -58,5 +58,11 @@ step "rolldvantage — web build"
 # ---- 4. Consumer: end-to-end tests (real browser, full dev stack) ----
 step "rolldvantage — e2e (Playwright; auto-starts the dev stack the human way)"
 ( cd "$CONSUMER_DIR" && npx playwright test )
+
+# ---- 5. Consumer: real print-pipeline gate (Chromium + Firefox "Save to PDF") ----
+# The strongest print check drives the ACTUAL print pipeline (not emulateMedia),
+# so a print-layout regression fails validation. It spawns its own dev server.
+step "rolldvantage — print-check (real Chromium + Firefox print pipeline)"
+( cd "$CONSUMER_DIR" && npm run print-check )
 
 printf '\n\033[1;32mAll validation steps passed.\033[0m\n'

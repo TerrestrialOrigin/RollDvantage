@@ -170,27 +170,36 @@ describe('applyMenuSemantics', () => {
 
   it('ArrowDown and ArrowUp move focus and wrap at both ends', () => {
     applyMenuSemantics(menu, noop);
-    pressKey(items[0], 'ArrowDown');
-    expect(document.activeElement).toBe(items[1]);
-    pressKey(items[1], 'ArrowDown');
-    pressKey(items[2], 'ArrowDown');                       // wraps last -> first
-    expect(document.activeElement).toBe(items[0]);
-    pressKey(items[0], 'ArrowUp');                         // wraps first -> last
-    expect(document.activeElement).toBe(items[2]);
+    const [alpha, beta, gamma] = items;
+    expect(alpha && beta && gamma).toBeTruthy();
+    if (!alpha || !beta || !gamma) return;
+    pressKey(alpha, 'ArrowDown');
+    expect(document.activeElement).toBe(beta);
+    pressKey(beta, 'ArrowDown');
+    pressKey(gamma, 'ArrowDown');                          // wraps last -> first
+    expect(document.activeElement).toBe(alpha);
+    pressKey(alpha, 'ArrowUp');                            // wraps first -> last
+    expect(document.activeElement).toBe(gamma);
   });
 
   it('Home and End jump to the first and last items', () => {
     applyMenuSemantics(menu, noop);
-    pressKey(items[0], 'End');
-    expect(document.activeElement).toBe(items[2]);
-    pressKey(items[2], 'Home');
-    expect(document.activeElement).toBe(items[0]);
+    const [alpha, , gamma] = items;
+    expect(alpha && gamma).toBeTruthy();
+    if (!alpha || !gamma) return;
+    pressKey(alpha, 'End');
+    expect(document.activeElement).toBe(gamma);
+    pressKey(gamma, 'Home');
+    expect(document.activeElement).toBe(alpha);
   });
 
   it('Escape invokes onClose', () => {
     const onClose = vi.fn();
     applyMenuSemantics(menu, onClose);
-    pressKey(items[0], 'Escape');
+    const alpha = items[0];
+    expect(alpha).toBeDefined();
+    if (!alpha) return;
+    pressKey(alpha, 'Escape');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

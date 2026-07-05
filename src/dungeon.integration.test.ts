@@ -25,7 +25,7 @@ function assertRenderableContract(dungeon: ReturnType<typeof generateDungeon>) {
   // floor is a gh x gw matrix of 0/1 cells
   expect(Array.isArray(dungeon.floor)).toBe(true);
   expect(dungeon.floor.length).toBe(dungeon.grid.gh);
-  expect(dungeon.floor[0].length).toBe(dungeon.grid.gw);
+  expect(dungeon.floor[0]?.length).toBe(dungeon.grid.gw);
 
   // markers carry the type/x/y the symbol() renderer switches on
   expect(Array.isArray(dungeon.markers)).toBe(true);
