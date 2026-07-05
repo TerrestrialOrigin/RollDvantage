@@ -280,6 +280,134 @@ test('both maps expose accessible names; the DM name carries room count and dept
   await expect(page.getByRole('img', { name: /The Mansion — player map/ })).toHaveCount(1);
 });
 
+/** Grid cells occupied by a marker glyph, as "x,y" keys (glyphs bake absolute
+    coordinates in, so occupancy comes from each glyph's bbox center). */
+async function occupiedCells(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const svg = document.querySelector<SVGSVGElement>('#dm-map svg')!;
+    const firstFloorRect = svg.querySelector<SVGRectElement>('.floor rect')!;
+    const cell = parseFloat(firstFloorRect.getAttribute('width')!);
+    const cells: string[] = [];
+    svg.querySelectorAll('g.mk').forEach((marker) => {
+      const box = (marker as SVGGElement).getBBox();
+      cells.push(Math.floor((box.x + box.width / 2) / cell) + ',' + Math.floor((box.y + box.height / 2) / cell));
+    });
+    return cells;
+  });
+}
+
+/** Step the (already-focused) cursor by a grid delta with arrow presses — used
+    while holding a marker, so re-focusing (which would cancel the pickup) is avoided. */
+async function stepBy(page: Page, deltaX: number, deltaY: number): Promise<void> {
+  for (let step = 0; step < Math.abs(deltaX); step++) await page.keyboard.press(deltaX > 0 ? 'ArrowRight' : 'ArrowLeft');
+  for (let step = 0; step < Math.abs(deltaY); step++) await page.keyboard.press(deltaY > 0 ? 'ArrowDown' : 'ArrowUp');
+}
+
+/** Place a monster marker at a cell entirely by keyboard, then deselect the tool. */
+async function placeMonsterAt(page: Page, cell: { x: number; y: number }): Promise<void> {
+  const monsterButton = page.locator('.legend-item[data-marker-type="monster"]');
+  await monsterButton.click();
+  await moveCursorTo(page, cell.x, cell.y);
+  await page.keyboard.press('Enter');
+  await monsterButton.click();                                  // toggle the tool back off
+  await expect(monsterButton).toHaveAttribute('aria-pressed', 'false');
+}
+
+test('picks up a placed marker with M and drops it on a new floor cell (Enter)', async ({ page }) => {
+  const before = await page.locator('#dm-map .mk').count();
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before + 1);
+
+  const destination = await findPlaceableCell(page);              // origin now occupied → a fresh cell
+  expect(destination).not.toEqual(origin);
+
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('m');                                 // pick up
+  await expect(page.locator('#kbd-cursor rect.holding')).toHaveCount(1);   // distinct "holding" cursor
+  await stepBy(page, destination.x - origin.x, destination.y - origin.y);
+  await page.keyboard.press('Enter');                             // drop
+
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before + 1);       // moved, not duplicated
+  const occupied = await occupiedCells(page);
+  expect(occupied).toContain(destination.x + ',' + destination.y);
+  expect(occupied).not.toContain(origin.x + ',' + origin.y);
+});
+
+test('a keyboard-moved marker carries its note to the new cell', async ({ page }) => {
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+
+  // annotate the marker (no tool active → Enter annotates the feature at the cell)
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#note-modal')).toBeVisible();
+  await page.locator('#note-text').fill('Sentinel');
+  await page.click('#note-save');
+  await expect(page.locator('#note-modal')).toBeHidden();
+
+  // move it by keyboard
+  const destination = await findPlaceableCell(page);
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('m');
+  await stepBy(page, destination.x - origin.x, destination.y - origin.y);
+  await page.keyboard.press('Enter');
+
+  // re-open the note at the destination — the marker (prioritised over rooms) kept its text
+  await moveCursorTo(page, destination.x, destination.y);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#note-modal')).toBeVisible();
+  await expect(page.locator('#note-text')).toHaveValue('Sentinel');
+});
+
+test('dropping a held marker on a non-floor cell is denied — marker unchanged (denial)', async ({ page }) => {
+  const before = await page.locator('#dm-map .mk').count();
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+  const empty = await findEmptyCell(page);
+
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('m');
+  await stepBy(page, empty.x - origin.x, empty.y - origin.y);
+  await page.keyboard.press('Enter');                            // denied — empty cell is not placeable
+
+  await expect(page.locator('#dm-map .mk')).toHaveCount(before + 1);
+  const occupied = await occupiedCells(page);
+  expect(occupied).toContain(origin.x + ',' + origin.y);         // still at origin
+  expect(occupied).not.toContain(empty.x + ',' + empty.y);
+});
+
+test('Escape cancels a keyboard pickup — marker stays put', async ({ page }) => {
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+  const destination = await findPlaceableCell(page);
+
+  await moveCursorTo(page, origin.x, origin.y);
+  await page.keyboard.press('m');
+  await stepBy(page, destination.x - origin.x, destination.y - origin.y);
+  await page.keyboard.press('Escape');                           // cancel the pickup
+  await page.keyboard.press('Enter');                            // no longer holding → would annotate, not move
+
+  const occupied = await occupiedCells(page);
+  expect(occupied).toContain(origin.x + ',' + origin.y);         // marker never left origin
+  expect(occupied).not.toContain(destination.x + ',' + destination.y);
+});
+
+test('T cycles a marker type forward and Shift+T backward, announced in the live region', async ({ page }) => {
+  const origin = await findPlaceableCell(page);
+  await placeMonsterAt(page, origin);
+
+  await moveCursorTo(page, origin.x, origin.y);
+  await expect(page.locator('#mode-hint')).toContainText('monster marker');   // cursor on the monster
+  await expect(page.locator('#mode-hint')).toContainText('T to change type');  // gesture is discoverable
+
+  await page.keyboard.press('t');                                // monster → boss
+  await expect(page.locator('#mode-hint')).toContainText('boss marker');
+
+  await page.keyboard.press('Shift+T');                          // boss → monster
+  await expect(page.locator('#mode-hint')).toContainText('monster marker');
+});
+
 test('map surface and legend buttons are tab-reachable with a visible focus indicator', async ({ page }) => {
   await tabTo(page, '#dm-map');
   const mapOutline = await page.evaluate(() => getComputedStyle(document.querySelector('#dm-map')!).outlineStyle);
