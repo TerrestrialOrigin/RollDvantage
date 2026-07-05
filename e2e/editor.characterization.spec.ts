@@ -40,7 +40,7 @@ test('loads a fixture dungeon deterministically', async ({ page }) => {
 
 test('generates a "Map only" dungeon from the New menu', async ({ page }) => {
   await page.click('#btn-new');
-  await page.getByRole('button', { name: 'Map only' }).click();
+  await page.getByRole('menuitem', { name: 'Map only' }).click();
   await expect(page.locator('#dm-map svg.dmap')).toBeVisible();
   await expect(page.locator('#dm-map .walls')).toHaveCount(1);
 });

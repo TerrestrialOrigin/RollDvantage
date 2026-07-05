@@ -93,7 +93,7 @@ test('ships a CSP that forbids inline script yet allows the hashed toolbar scrip
 
 test('New → Save → Load round-trip works inside the sandboxed shell', async () => {
   await appWindow.click('#btn-new');
-  await appWindow.getByRole('button', { name: 'Map only' }).click();
+  await appWindow.getByRole('menuitem', { name: 'Map only' }).click();
   await expect(appWindow.locator('#dm-map svg.dmap')).toBeVisible();
   const generatedName = await appWindow.locator('#dungeon-name-dm').textContent();
   expect(generatedName).toBeTruthy();
@@ -120,7 +120,7 @@ test('New → Save → Load round-trip works inside the sandboxed shell', async 
   /* Generate a different dungeon, then load the saved one back and confirm
      the round-trip restored it. */
   await appWindow.click('#btn-new');
-  await appWindow.getByRole('button', { name: 'Map only' }).click();
+  await appWindow.getByRole('menuitem', { name: 'Map only' }).click();
   await appWindow.setInputFiles('#file-load', savedPath);
   await expect(appWindow.locator('#dungeon-name-dm')).toHaveText(generatedName ?? '');
   await expect(appWindow.locator('#dm-map svg.dmap')).toBeVisible();

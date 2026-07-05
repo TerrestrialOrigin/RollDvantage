@@ -135,6 +135,8 @@
     background:oklch(0.935 0.012 84);
     box-shadow:inset 0 0 0 2px oklch(0.78 0.04 80 / .18);
   }
+  /* keyboard a11y: entries are focusable buttons that open the note dialog */
+  .ck-box:focus-visible{ outline:2px solid var(--gold-deep); outline-offset:3px; }
   .ck-letter{
     flex:none; min-width:34px; text-align:center; line-height:1;
     font-family:var(--font-display); font-weight:900; font-size:32px;
@@ -228,6 +230,11 @@
     padding:9px 13px; cursor:pointer; transition:.12s;
   }
   .cell-menu button:hover{ background:oklch(0.86 0.04 84 / .6); color:var(--gold-deep); }
+  /* keyboard a11y: the arrow-key-focused menu item reads like the hovered one */
+  .cell-menu button:focus-visible{
+    background:oklch(0.86 0.04 84 / .6); color:var(--gold-deep);
+    outline:2px solid var(--gold-deep); outline-offset:-2px;
+  }
   .cell-menu button.danger{ color:oklch(0.5 0.13 32); }
   .cell-menu button.danger:hover{ background:oklch(0.9 0.06 33 / .5); color:oklch(0.45 0.15 32); }
   .cell-menu .ck{ display:inline-block; width:1.2em; color:var(--gold-deep); }
@@ -486,7 +493,7 @@
 </section>
 
 <!-- ============================ ANNOTATION DIALOG (screen only) ============================ -->
-<div class="note-modal" id="note-modal" hidden>
+<div class="note-modal" id="note-modal" role="dialog" aria-modal="true" aria-labelledby="note-ref note-kind" hidden>
   <div class="note-backdrop"></div>
   <div class="note-panel">
     <div class="note-head">
@@ -504,10 +511,10 @@
 </div>
 
 <!-- ============================ GENERATE WARNING (screen only) ============================ -->
-<div class="note-modal" id="gen-warn" hidden>
+<div class="note-modal" id="gen-warn" role="dialog" aria-modal="true" aria-labelledby="gw-title" hidden>
   <div class="note-backdrop"></div>
   <div class="note-panel">
-    <div class="warn-title">Unsaved Changes</div>
+    <div class="warn-title" id="gw-title">Unsaved Changes</div>
     <p class="warn-msg">You are about to lose the changes you made to this map.</p>
     <div class="note-actions">
       <button id="gw-cancel">Cancel</button>

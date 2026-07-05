@@ -6,6 +6,7 @@
    ============================================================ */
 import type { MarkerType } from '../model/types';
 import { featureAt, featureBBox } from '../editing/featureQueries';
+import { applyMenuSemantics, type MenuSemantics } from './dialogA11y';
 import type { ControllerContext } from './types';
 
 interface MenuItem { label: string; danger?: boolean; check?: boolean; sep?: boolean; act: (() => void) | null; }
@@ -17,9 +18,13 @@ const MARKER_TYPES: [MarkerType, string][] = [
 export function attachContextMenuController(context: ControllerContext): { openContextMenu: (gx: number, gy: number, clientX: number, clientY: number) => void } {
   const { editor, getDungeon } = context;
   let cellMenu: HTMLElement | null = null;
+  let menuSemantics: MenuSemantics | null = null;
 
   function closeCellMenu(): void {
-    if (cellMenu) { cellMenu.remove(); cellMenu = null; document.removeEventListener('pointerdown', menuOutside, true); }
+    if (!cellMenu) return;
+    cellMenu.remove(); cellMenu = null;
+    document.removeEventListener('pointerdown', menuOutside, true);
+    menuSemantics?.restoreFocus(); menuSemantics = null;
   }
   function menuOutside(event: PointerEvent): void { if (cellMenu && !cellMenu.contains(event.target as Node)) closeCellMenu(); }
 
@@ -58,6 +63,7 @@ export function attachContextMenuController(context: ControllerContext): { openC
     const viewportWidth = window.innerWidth, viewportHeight = window.innerHeight;
     menu.style.left = Math.max(8, Math.min(clientX, viewportWidth - menu.offsetWidth - 8)) + 'px';
     menu.style.top = Math.max(8, Math.min(clientY, viewportHeight - menu.offsetHeight - 8)) + 'px';
+    menuSemantics = applyMenuSemantics(menu, closeCellMenu);
     setTimeout(() => { document.addEventListener('pointerdown', menuOutside, true); }, 0);
   }
 

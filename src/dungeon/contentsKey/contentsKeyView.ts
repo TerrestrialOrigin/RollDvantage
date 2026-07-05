@@ -38,7 +38,13 @@ export function renderContentsKey(annotations: AnnotationEntry[], dungeon: Dunge
     holder.innerHTML = '<div class="ck-box"><div class="ck-letter">' + entry.o.ref + '</div>' +
       '<div class="ck-body"><div class="ck-type">' + esc(entryLabel(dungeon, entry)) + '</div>' +
       '<div class="ck-text">' + esc(entry.o.note ?? '') + '</div></div></div>';
-    return holder.firstChild as HTMLElement;
+    const box = holder.firstChild as HTMLElement;
+    // Keyboard-activatable button semantics (H6). The accessible name carries a
+    // user-authored label, so it is applied as an attribute — never as markup.
+    box.setAttribute('role', 'button');
+    box.setAttribute('tabindex', '0');
+    box.setAttribute('aria-label', 'Edit entry ' + (entry.o.ref ?? '') + ': ' + entryLabel(dungeon, entry));
+    return box;
   }
 
   let page = newPage();

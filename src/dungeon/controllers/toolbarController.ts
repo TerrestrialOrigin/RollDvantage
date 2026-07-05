@@ -9,6 +9,7 @@ import { symbol } from '../rendering/symbols';
 import { updateFootNames } from '../rendering/domRenderer';
 import { downloadDungeon, readDungeonFile, InvalidDungeonFileError } from '../persistence/dungeonFile';
 import { MIN_LEVEL, MAX_LEVEL, type DungeonStore } from '../state/dungeonStore';
+import { openDialog, applyMenuSemantics, type DialogSession, type MenuSemantics } from './dialogA11y';
 import type { GenerationMode, DungeonEditor } from '../api/dungeonEditor';
 
 export interface ToolbarHandles { updateLevelUI: () => void; updateUndoRedoUI: () => void; }
@@ -35,7 +36,13 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
   const newButton = document.getElementById('btn-new');
   let pendingMode: GenerationMode = 'full';
   let genMenu: HTMLElement | null = null;
-  function closeGenMenu(): void { if (genMenu) { genMenu.remove(); genMenu = null; document.removeEventListener('pointerdown', genMenuOutside, true); } }
+  let genMenuSemantics: MenuSemantics | null = null;
+  function closeGenMenu(): void {
+    if (!genMenu) return;
+    genMenu.remove(); genMenu = null;
+    document.removeEventListener('pointerdown', genMenuOutside, true);
+    genMenuSemantics?.restoreFocus(); genMenuSemantics = null;
+  }
   function genMenuOutside(event: PointerEvent): void { if (genMenu && !genMenu.contains(event.target as Node) && event.target !== newButton) closeGenMenu(); }
   function startGenerate(mode: GenerationMode): void { pendingMode = mode; closeGenMenu(); if (store.isDirty()) openGenWarn(); else editor.generate(mode); }
   function openGenMenu(): void {
@@ -50,13 +57,27 @@ export function attachToolbarController(editor: DungeonEditor, store: DungeonSto
     const rect = newButton!.getBoundingClientRect();
     menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
     menu.style.top = Math.max(8, rect.top - menu.offsetHeight - 8) + 'px';
+    genMenuSemantics = applyMenuSemantics(menu, closeGenMenu);
     setTimeout(() => { document.addEventListener('pointerdown', genMenuOutside, true); }, 0);
   }
   if (newButton) newButton.addEventListener('click', openGenMenu);
 
   const genWarn = document.getElementById('gen-warn');
-  function openGenWarn(): void { if (genWarn) genWarn.hidden = false; }
-  function closeGenWarn(): void { if (genWarn) genWarn.hidden = true; }
+  let genWarnSession: DialogSession | null = null;
+  function openGenWarn(): void {
+    if (!genWarn) return;
+    if (genWarnSession) { genWarnSession.close(); genWarnSession = null; }
+    genWarnSession = openDialog({
+      dialog: genWarn,
+      panel: genWarn.querySelector<HTMLElement>('.note-panel')!,
+      initialFocus: document.getElementById('gw-cancel')!,
+      onEscape: closeGenWarn,
+    });
+  }
+  function closeGenWarn(): void {
+    if (genWarnSession) { genWarnSession.close(); genWarnSession = null; }
+    else if (genWarn) genWarn.hidden = true;
+  }
   if (genWarn) {
     (genWarn.querySelector('.note-backdrop')!).addEventListener('click', closeGenWarn);
     document.getElementById('gw-cancel')!.addEventListener('click', closeGenWarn);
