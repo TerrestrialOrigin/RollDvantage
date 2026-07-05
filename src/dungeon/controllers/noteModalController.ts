@@ -9,6 +9,7 @@ import { letterFor } from '../rendering/symbols';
 import { annotatableMarkerAt, roomAt } from '../editing/featureQueries';
 import { isBaseFloor } from '../geometry/topology';
 import { dmSvg, cellAtClient } from './mapSurface';
+import { openDialog, type DialogSession } from './dialogA11y';
 import type { ControllerContext } from './types';
 
 export interface NoteModalHandles {
@@ -30,10 +31,12 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
 
   let noteTarget: Annotatable | null = null;
   let noteList: Annotatable[] | null = null;
+  let dialogSession: DialogSession | null = null;
 
   function openNote(target: Annotatable, kind: EntryKind, list?: Annotatable[] | null): void {
     if (!modal) return;
     const dungeon = getDungeon(); if (!dungeon) return;
+    if (dialogSession) { dialogSession.close(); dialogSession = null; }
     noteTarget = target; noteList = list ?? null;
     const annotations = relabel(dungeon);
     elementKind.contentEditable = 'true';                      // every title is editable
@@ -43,10 +46,18 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     elementRef.textContent = target.ref ?? letterFor(annotations.length);
     elementText.value = target.note ?? '';
     elementDelete.style.display = (target.note || target.label) ? '' : 'none';
-    modal.hidden = false;
-    setTimeout(() => { elementText.focus(); }, 30);
+    dialogSession = openDialog({
+      dialog: modal,
+      panel: modal.querySelector<HTMLElement>('.note-panel')!,
+      initialFocus: elementText,
+      onEscape: closeNote,
+    });
   }
-  function closeNote(): void { if (modal) modal.hidden = true; noteTarget = null; noteList = null; }
+  function closeNote(): void {
+    if (dialogSession) { dialogSession.close(); dialogSession = null; }
+    else if (modal) modal.hidden = true;
+    noteTarget = null; noteList = null;
+  }
   function saveNote(): void {
     if (!noteTarget) return;
     editor.setNote(noteTarget, noteList, elementText.value, elementKind.textContent || '');
@@ -90,16 +101,27 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     });
   }
 
-  // double-click a Contents Key entry to edit it (same dialog as on the map)
+  // click or keyboard-activate a Contents Key entry to edit it (same dialog as on the map)
   const ckContainer = document.getElementById('contents-key');
-  if (ckContainer) ckContainer.addEventListener('click', (event) => {
-    const dungeon = getDungeon();
-    const box = (event.target as Element).closest ? (event.target as Element).closest('.ck-box') : null;
-    if (!box || !dungeon) return;
+  function activateContentsKeyBox(box: Element): void {
+    const dungeon = getDungeon(); if (!dungeon) return;
     const letterElement = box.querySelector('.ck-letter'); if (!letterElement) return;
     const entry = findAnnotationByRef((letterElement.textContent || '').trim()); if (!entry) return;
     openNote(entry.o, entry.kind, entry.kind === 'corridor' ? dungeon.corridorNotes! : null);
-  });
+  }
+  if (ckContainer) {
+    ckContainer.addEventListener('click', (event) => {
+      const box = (event.target as Element).closest ? (event.target as Element).closest('.ck-box') : null;
+      if (box) activateContentsKeyBox(box);
+    });
+    ckContainer.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const box = (event.target as Element).closest ? (event.target as Element).closest('.ck-box') : null;
+      if (!box) return;
+      event.preventDefault();                                  // keep Space from scrolling the page
+      activateContentsKeyBox(box);
+    });
+  }
 
   // modal buttons + keyboard
   if (modal) {
@@ -107,13 +129,12 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     elementDelete.addEventListener('click', deleteNote);
     document.getElementById('note-cancel')!.addEventListener('click', closeNote);
     (modal.querySelector('.note-backdrop')!).addEventListener('click', closeNote);
+    // Escape is handled at the dialog level by openDialog — no per-field binding.
     elementText.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); saveNote(); }
-      else if (event.key === 'Escape') { event.preventDefault(); closeNote(); }
     });
     elementKind.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') { event.preventDefault(); elementText.focus(); }
-      else if (event.key === 'Escape') { event.preventDefault(); closeNote(); }
     });
   }
 

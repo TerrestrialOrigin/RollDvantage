@@ -7,6 +7,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
+  /* Vite serves the app unbundled in dev, so a cold page load can spike past
+     Playwright's 30s default on a low-core machine as the suite grows. Give
+     each test headroom rather than letting infra tail-latency flake the run. */
+  timeout: 60_000,
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:5173',
