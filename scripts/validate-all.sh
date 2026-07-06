@@ -28,8 +28,11 @@ CONSUMER_DIR="$ROOT/rolldvantage"
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
 # ---- 1. Library: lint + type-check + test + build (the build script gates all of these) ----
-step "auto-stuff-generator — build (lint + type-check + jest + bundle + types)"
-( cd "$LIBRARY_DIR" && npm run build )
+# auto-stuff-generator is an npm-workspaces monorepo: LIBRARY_DIR is the WORKSPACE ROOT,
+# and its root `build` script fans out to every workspace package (`npm run build
+# --workspaces --if-present`), each running its own lint + type-check + jest + bundle + types.
+step "auto-stuff-generator — workspace build (fans out: lint + type-check + jest + bundle + types)"
+( cd "$LIBRARY_DIR" && npm run build --workspaces --if-present )
 
 # ---- 2. Guard: consumer must consume every published dependency from the registry ----
 # The shipped product must reference published packages (semver ranges resolving to
