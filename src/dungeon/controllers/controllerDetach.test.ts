@@ -13,7 +13,7 @@ import { attachToolbarController } from './toolbarController';
 import { attachStructureModeController } from './structureModeController';
 import { attachDragPlaceController } from './dragPlaceController';
 import type { ControllerContext, ModeState } from './types';
-import type { Dungeon, ExternalDungeon } from '../model/types';
+import type { Dungeon } from '../model/types';
 
 function memStore(): { getItem(key: string): string | null; setItem(key: string, value: string): void } {
   const data: Record<string, string> = {};
@@ -27,7 +27,7 @@ function realStack(): Stack {
   const store = new DungeonStore(history, memStore());
   const editor = createDungeonEditor(store, history);
   editor.loadFromJson(migrateDungeon(
-    JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'full'))) as ExternalDungeon));
+    JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'full')))));
   const modes: ModeState = { current: null, selectedMarkerType: null };
   return { editor, store, context: { editor, getDungeon: () => store.getCurrent(), modes }, getDungeon: () => store.getCurrent() };
 }
@@ -43,7 +43,7 @@ describe('contextMenuController detach()', () => {
     const dungeon = stack.getDungeon()!;
     const room = dungeon.rooms[0];
     if (!room) throw new Error('fixture is expected to have at least one room');
-    open(room.x, room.y, 50, 50);
+    open(room.gridX, room.gridY, 50, 50);
     return document.querySelector<HTMLElement>('.cell-menu');
   }
 

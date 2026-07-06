@@ -3,18 +3,18 @@ import { cellFromClient, cellClamped, edgeDir, corridorCells } from './grid';
 import { straightRunWhere, isCorridorCell, roomIndexAt } from './topology';
 import type { Dungeon, Grid } from '../model/types';
 
-const grid: Grid = { width: 10, height: 8, cell: 20 };
+const grid: Grid = { width: 10, height: 8, cellSize: 20 };
 const rect = { left: 0, top: 0, width: 200, height: 160, right: 200, bottom: 160 } as DOMRect;
 
 describe('grid geometry', () => {
   it('maps a client point to the right cell', () => {
-    expect(cellFromClient(grid, rect, 30, 50)).toMatchObject({ x: 1, y: 2, inside: true });
+    expect(cellFromClient(grid, rect, 30, 50)).toMatchObject({ gridX: 1, gridY: 2, inside: true });
   });
   it('returns null outside the grid', () => {
     expect(cellFromClient(grid, rect, 9999, 50)).toBeNull();
   });
   it('clamps out-of-bounds points to the grid edge', () => {
-    expect(cellClamped(grid, rect, -100, 9999)).toEqual({ x: 0, y: 7 });
+    expect(cellClamped(grid, rect, -100, 9999)).toEqual({ gridX: 0, gridY: 7 });
   });
   it('derives the nearest boundary direction', () => {
     expect(edgeDir(grid, 0, 4)).toBe('right');
@@ -44,7 +44,7 @@ describe('room hit-test', () => {
   it('identifies a corridor cell as floor outside any room', () => {
     const dungeon = {
       floor: [[0, 0, 0], [0, 1, 1]],
-      rooms: [{ x: 1, y: 1, w: 1, h: 1 }],
+      rooms: [{ gridX: 1, gridY: 1, width: 1, height: 1 }],
     } as unknown as Dungeon;
     expect(roomIndexAt(dungeon, 1, 1)).toBe(0);
     expect(isCorridorCell(dungeon, 2, 1)).toBe(true); // floor but not in the room

@@ -2,7 +2,7 @@
    Contents-Key label derivation — pure functions over a Dungeon.
 
    `relabel` collects every annotated feature, sorts by sequence, and assigns
-   reference letters (mutating the features' `ref`, matching the original).
+   reference letters (mutating the features' `referenceLabel`, matching the original).
    `esc` HTML-escapes user text before it is inserted via innerHTML (XSS guard).
    Logic preserved verbatim from the original closure helpers.
    ============================================================ */
@@ -13,7 +13,7 @@ export type EntryKind = 'marker' | 'room' | 'secretRoom' | 'corridor';
 
 /** An annotated feature plus the kind of feature it is. */
 export interface AnnotationEntry {
-  feature: Annotatable & { type?: MarkerType; x?: number; y?: number };
+  feature: Annotatable & { type?: MarkerType; gridX?: number; gridY?: number };
   kind: EntryKind;
 }
 
@@ -30,7 +30,7 @@ export function rawLabel(dungeon: Dungeon, entry: AnnotationEntry): string {
   if (entry.kind === 'secretRoom') return 'Secret Chamber';
   if (entry.kind === 'room') return 'Chamber';
   if (entry.kind === 'corridor') {
-    return (dungeon.secretFloor?.[entry.feature.y!]?.[entry.feature.x!] === 1) ? 'Secret Passage' : 'Corridor';
+    return (dungeon.secretFloor?.[entry.feature.gridY!]?.[entry.feature.gridX!] === 1) ? 'Secret Passage' : 'Corridor';
   }
   return 'Note';
 }
@@ -39,7 +39,7 @@ export function entryLabel(dungeon: Dungeon, entry: AnnotationEntry): string {
   return entry.feature.label ?? rawLabel(dungeon, entry);
 }
 
-/** Collect annotated features, sort by sequence, assign reference letters (mutates refs). */
+/** Collect annotated features, sort by sequence, assign reference letters (mutates referenceLabel). */
 export function relabel(dungeon: Dungeon | null): AnnotationEntry[] {
   if (!dungeon) return [];
   const annotations: AnnotationEntry[] = [];
@@ -47,10 +47,10 @@ export function relabel(dungeon: Dungeon | null): AnnotationEntry[] {
   (dungeon.rooms || []).forEach((room) => { if (room.note || room.label) annotations.push({ feature: room, kind: 'room' }); });
   (dungeon.secretRooms ?? []).forEach((room) => { if (room.note || room.label) annotations.push({ feature: room, kind: 'secretRoom' }); });
   (dungeon.corridorNotes ?? []).forEach((note) => { if (note.note || note.label) annotations.push({ feature: note, kind: 'corridor' }); });
-  annotations.sort((a, b) => (a.feature.seq ?? 0) - (b.feature.seq ?? 0));
-  let maxSeq = -1;
-  annotations.forEach((entry, index) => { entry.feature.ref = letterFor(index); if ((entry.feature.seq ?? 0) > maxSeq) maxSeq = (entry.feature.seq ?? 0); });
-  if (dungeon._seq == null || dungeon._seq <= maxSeq) dungeon._seq = maxSeq + 1;
+  annotations.sort((first, second) => (first.feature.sequence ?? 0) - (second.feature.sequence ?? 0));
+  let maxSequence = -1;
+  annotations.forEach((entry, index) => { entry.feature.referenceLabel = letterFor(index); if ((entry.feature.sequence ?? 0) > maxSequence) maxSequence = (entry.feature.sequence ?? 0); });
+  if (dungeon._sequence == null || dungeon._sequence <= maxSequence) dungeon._sequence = maxSequence + 1;
   return annotations;
 }
 

@@ -40,10 +40,10 @@ export function attachDragPlaceController(context: ControllerContext): DragPlace
 
   function showTarget(cell: CellHit): void {
     const dungeon = getDungeon()!;
-    const pixel = dungeon.grid.cell * cell.scale, highlight = drag!.highlight;
+    const pixel = dungeon.grid.cellSize * cell.scale, highlight = drag!.highlight;
     highlight.style.display = 'block';
-    highlight.style.left = (cell.rect.left + cell.x * dungeon.grid.cell * cell.scale) + 'px';
-    highlight.style.top = (cell.rect.top + cell.y * dungeon.grid.cell * cell.scale) + 'px';
+    highlight.style.left = (cell.rect.left + cell.gridX * dungeon.grid.cellSize * cell.scale) + 'px';
+    highlight.style.top = (cell.rect.top + cell.gridY * dungeon.grid.cellSize * cell.scale) + 'px';
     highlight.style.width = pixel + 'px'; highlight.style.height = pixel + 'px';
   }
 
@@ -64,7 +64,7 @@ export function attachDragPlaceController(context: ControllerContext): DragPlace
     drag.ghost.style.left = event.clientX + 'px'; drag.ghost.style.top = event.clientY + 'px';
     const dungeon = getDungeon();
     const cell = dungeon ? cellAtClient(dungeon, event.clientX, event.clientY) : null;
-    if (cell && cell.inside && dungeon && placeable(dungeon, cell.x, cell.y)) { showTarget(cell); drag.target = cell; }
+    if (cell && cell.inside && dungeon && placeable(dungeon, cell.gridX, cell.gridY)) { showTarget(cell); drag.target = cell; }
     else { drag.highlight.style.display = 'none'; drag.target = null; }
   }
 
@@ -76,23 +76,23 @@ export function attachDragPlaceController(context: ControllerContext): DragPlace
     const dungeon = getDungeon();
     if (!cell || !dungeon) return;
     if (finished.mode === 'place') {
-      if (finished.type === 'secret') { editor.makeSecret(cell.x, cell.y); return; } // (S) converts a corridor/room to secret
-      editor.addMarker(finished.type, cell.x, cell.y);
+      if (finished.type === 'secret') { editor.makeSecret(cell.gridX, cell.gridY); return; } // (S) converts a corridor/room to secret
+      editor.addMarker(finished.type, cell.gridX, cell.gridY);
     } else {
       const marker = dungeon.markers[finished.index];
       if (marker) {
         if (marker.type === 'secret') {
           // the (S) badge IS the secret status — dragging it MOVES the secret.
-          const originX = marker.x, originY = marker.y;
-          const alreadySecret = dungeon.secretFloor?.[cell.y]?.[cell.x] === 1;
-          const canConvert = !alreadySecret && (roomIndexAt(dungeon, cell.x, cell.y) >= 0 || isCorridorCell(dungeon, cell.x, cell.y));
+          const originX = marker.gridX, originY = marker.gridY;
+          const alreadySecret = dungeon.secretFloor?.[cell.gridY]?.[cell.gridX] === 1;
+          const canConvert = !alreadySecret && (roomIndexAt(dungeon, cell.gridX, cell.gridY) >= 0 || isCorridorCell(dungeon, cell.gridX, cell.gridY));
           if (canConvert) {
             editor.unmakeSecret(originX, originY); // restore the old room/passage
-            editor.makeSecret(cell.x, cell.y);     // make the dropped-on room/corridor secret
+            editor.makeSecret(cell.gridX, cell.gridY);     // make the dropped-on room/corridor secret
           }
           return; // a bad drop leaves the secret untouched
         }
-        editor.moveMarker(finished.index, cell.x, cell.y);
+        editor.moveMarker(finished.index, cell.gridX, cell.gridY);
       }
     }
   }
@@ -132,7 +132,7 @@ export function attachDragPlaceController(context: ControllerContext): DragPlace
       const dungeon = getDungeon();
       const svg = dmSvg(); if (!svg || !dungeon) return;
       const cell = cellAtClient(dungeon, pointerEvent.clientX, pointerEvent.clientY); if (!cell?.inside) return;
-      const index = markerAtCell(dungeon, cell.x, cell.y);
+      const index = markerAtCell(dungeon, cell.gridX, cell.gridY);
       const marker = dungeon.markers[index];
       if (index < 0 || !marker) return;           // empty square — leave it alone
       startDrag({ mode: 'move', type: marker.type, index }, pointerEvent);

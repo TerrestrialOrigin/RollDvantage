@@ -39,9 +39,9 @@ export function attachDefaultTool(deps: DefaultToolDeps): StructureModeModule {
     if (!addDrag) return;
     if (!addDrag.armed) { if (withinArmThreshold(event, addDrag)) return; addDrag.armed = true; }
     const cell = clampedCellAtClient(getDungeon()!, event.clientX, event.clientY); if (!cell) return;
-    addDrag.currentX = cell.x; addDrag.currentY = cell.y;
-    if (addDrag.kind === 'corridor') drawCorridorPreview(getDungeon()!.grid.cell, corridorCells(addDrag.startX, addDrag.startY, cell.x, cell.y));
-    else drawRoomPreview(getDungeon()!.grid.cell, addDrag.startX, addDrag.startY, cell.x, cell.y);
+    addDrag.currentX = cell.gridX; addDrag.currentY = cell.gridY;
+    if (addDrag.kind === 'corridor') drawCorridorPreview(getDungeon()!.grid.cellSize, corridorCells(addDrag.startX, addDrag.startY, cell.gridX, cell.gridY));
+    else drawRoomPreview(getDungeon()!.grid.cellSize, addDrag.startX, addDrag.startY, cell.gridX, cell.gridY);
   }
   function onAddUp(): void {
     window.removeEventListener('pointermove', onAddMove); window.removeEventListener('pointerup', onAddUp);
@@ -55,10 +55,10 @@ export function attachDefaultTool(deps: DefaultToolDeps): StructureModeModule {
     if (modes.current || event.button !== 0) return;
     const dungeon = getDungeon()!;
     const svg = dmSvg(); const inside = svg ? cellAtClient(dungeon, event.clientX, event.clientY) : null; if (!inside?.inside) return;
-    if (markerAtCell(dungeon, inside.x, inside.y) >= 0) return;   // on a mark -> the move handler takes over
+    if (markerAtCell(dungeon, inside.gridX, inside.gridY) >= 0) return;   // on a mark -> the move handler takes over
     addDrag = {
-      kind: isBaseFloor(dungeon, inside.x, inside.y) ? 'corridor' : 'room',
-      startX: inside.x, startY: inside.y, currentX: inside.x, currentY: inside.y,
+      kind: isBaseFloor(dungeon, inside.gridX, inside.gridY) ? 'corridor' : 'room',
+      startX: inside.gridX, startY: inside.gridY, currentX: inside.gridX, currentY: inside.gridY,
       armed: false, dragStartClientX: event.clientX, dragStartClientY: event.clientY,
     };
     window.addEventListener('pointermove', onAddMove); window.addEventListener('pointerup', onAddUp);
@@ -71,8 +71,8 @@ export function attachDefaultTool(deps: DefaultToolDeps): StructureModeModule {
     if (!eraseDrag) return;
     if (!eraseDrag.armed) { if (withinArmThreshold(event, eraseDrag)) return; eraseDrag.armed = true; }
     const cell = clampedCellAtClient(getDungeon()!, event.clientX, event.clientY); if (!cell) return;
-    eraseDrag.currentX = cell.x; eraseDrag.currentY = cell.y;
-    drawDeletePreview(getDungeon()!.grid.cell, eraseDrag.startX, eraseDrag.startY, cell.x, cell.y);
+    eraseDrag.currentX = cell.gridX; eraseDrag.currentY = cell.gridY;
+    drawDeletePreview(getDungeon()!.grid.cellSize, eraseDrag.startX, eraseDrag.startY, cell.gridX, cell.gridY);
   }
   function onEraseUp(): void {
     window.removeEventListener('pointermove', onEraseMove); window.removeEventListener('pointerup', onEraseUp);
@@ -85,7 +85,7 @@ export function attachDefaultTool(deps: DefaultToolDeps): StructureModeModule {
     if (modes.current || event.button !== 2) return;
     const cell = clampedCellAtClient(getDungeon()!, event.clientX, event.clientY); if (!cell) return;
     eraseDrag = {
-      startX: cell.x, startY: cell.y, currentX: cell.x, currentY: cell.y,
+      startX: cell.gridX, startY: cell.gridY, currentX: cell.gridX, currentY: cell.gridY,
       armed: false, dragStartClientX: event.clientX, dragStartClientY: event.clientY,
     };
     window.addEventListener('pointermove', onEraseMove); window.addEventListener('pointerup', onEraseUp);

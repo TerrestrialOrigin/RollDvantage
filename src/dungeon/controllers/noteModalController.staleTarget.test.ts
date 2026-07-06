@@ -28,7 +28,7 @@ function openRowDungeon(): Dungeon {
   if (row) for (let x = 0; x < gridWidth; x++) row[x] = 1;
   return {
     seed: 1, name: 'Stale Note Test', depth: 'Depth 1',
-    grid: { width: gridWidth, height: gridHeight, cell: 24 },
+    grid: { width: gridWidth, height: gridHeight, cellSize: 24 },
     floor, rooms: [], markers: [],
     tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 0 },
   };
@@ -103,7 +103,7 @@ describe('note dialog target survives an undo triggered from within it', () => {
 
     // The note must land on the LIVE marker at (1,2), not a detached copy.
     const dungeon = stack.getDungeon();
-    const monster = dungeon.markers.find((marker) => marker.type === 'monster' && marker.x === 1 && marker.y === 2);
+    const monster = dungeon.markers.find((marker) => marker.type === 'monster' && marker.gridX === 1 && marker.gridY === 2);
     expect(monster).toBeDefined();
     expect(monster!.note).toBe('guardian of the vault');
   });

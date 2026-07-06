@@ -9,34 +9,34 @@ import { roomIndexAt, isCorridorCell, secretRoomIndexAt, isSecretCorridorCell, s
 export function ensureSecretFloor(dungeon: Dungeon): void {
   if (!dungeon.secretFloor) {
     const grid: number[][] = [];
-    for (let y = 0; y < dungeon.grid.height; y++) grid.push(new Array<number>(dungeon.grid.width).fill(0));
+    for (let row = 0; row < dungeon.grid.height; row++) grid.push(new Array<number>(dungeon.grid.width).fill(0));
     dungeon.secretFloor = grid;
   }
 }
 
-/** Turn the room or corridor run at (x,y) into a secret room / passage. */
-export function convertSecretAt(dungeon: Dungeon, x: number, y: number): void {
-  if (dungeon.secretFloor?.[y]?.[x] === 1) return; // already secret
-  const roomIndex = roomIndexAt(dungeon, x, y);
-  if (roomIndex < 0 && !isCorridorCell(dungeon, x, y)) return; // only rooms or corridors convert
+/** Turn the room or corridor run at (gridX,gridY) into a secret room / passage. */
+export function convertSecretAt(dungeon: Dungeon, gridX: number, gridY: number): void {
+  if (dungeon.secretFloor?.[gridY]?.[gridX] === 1) return; // already secret
+  const roomIndex = roomIndexAt(dungeon, gridX, gridY);
+  if (roomIndex < 0 && !isCorridorCell(dungeon, gridX, gridY)) return; // only rooms or corridors convert
   ensureSecretFloor(dungeon);
   const secretFloor = dungeon.secretFloor!;
   if (roomIndex >= 0) {
     const room = dungeon.rooms[roomIndex];
     if (!room) return; // roomIndex >= 0 was returned by roomIndexAt
-    for (let yy = room.y; yy < room.y + room.h; yy++) {
-      const floorRow = dungeon.floor[yy], secretRow = secretFloor[yy];
+    for (let row = room.gridY; row < room.gridY + room.height; row++) {
+      const floorRow = dungeon.floor[row], secretRow = secretFloor[row];
       if (!floorRow || !secretRow) continue;
-      for (let xx = room.x; xx < room.x + room.w; xx++) {
-        if (floorRow[xx] === 1) { floorRow[xx] = 0; secretRow[xx] = 1; }
+      for (let column = room.gridX; column < room.gridX + room.width; column++) {
+        if (floorRow[column] === 1) { floorRow[column] = 0; secretRow[column] = 1; }
       }
     }
     dungeon.rooms.splice(roomIndex, 1);
     dungeon.secretRooms = dungeon.secretRooms ?? [];
     dungeon.secretRooms.push(room); // keeps any note/letter; dashed outline marks it secret
   } else {
-    const run = straightRun(dungeon, x, y);
-    // Infinity sentinels: the run always contains at least (x,y), so every bound is overwritten.
+    const run = straightRun(dungeon, gridX, gridY);
+    // Infinity sentinels: the run always contains at least (gridX,gridY), so every bound is overwritten.
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     run.cells.forEach((cell) => {
       const floorRow = dungeon.floor[cell[1]], secretRow = secretFloor[cell[1]];
@@ -45,37 +45,37 @@ export function convertSecretAt(dungeon: Dungeon, x: number, y: number): void {
       if (cell[0] < minX) minX = cell[0]; if (cell[0] > maxX) maxX = cell[0]; if (cell[1] < minY) minY = cell[1]; if (cell[1] > maxY) maxY = cell[1];
     });
     dungeon.secretPaths = dungeon.secretPaths ?? [];
-    if (run.horiz) dungeon.secretPaths.push({ x1: minX, y1: y, x2: maxX, y2: y }); // dashed centerline
-    else dungeon.secretPaths.push({ x1: x, y1: minY, x2: x, y2: maxY });
+    if (run.horiz) dungeon.secretPaths.push({ startX: minX, startY: gridY, endX: maxX, endY: gridY }); // dashed centerline
+    else dungeon.secretPaths.push({ startX: gridX, startY: minY, endX: gridX, endY: maxY });
     const mid = run.cells[Math.floor(run.cells.length / 2)];
-    if (mid) dungeon.markers.push({ type: 'secret', x: mid[0], y: mid[1], placed: true }); // 'S' badge; run always contains (x,y)
+    if (mid) dungeon.markers.push({ type: 'secret', gridX: mid[0], gridY: mid[1], placed: true }); // 'S' badge; run always contains (gridX,gridY)
   }
 }
 
 /** Reverse of convertSecretAt: bring a secret room / passage back to a visible one. */
-export function unconvertSecret(dungeon: Dungeon, x: number, y: number): void {
+export function unconvertSecret(dungeon: Dungeon, gridX: number, gridY: number): void {
   if (!dungeon.secretFloor) return;
   const secretFloor = dungeon.secretFloor;
-  const secretIndex = secretRoomIndexAt(dungeon, x, y), gridWidth = dungeon.grid.width;
+  const secretIndex = secretRoomIndexAt(dungeon, gridX, gridY), gridWidth = dungeon.grid.width;
   if (secretIndex >= 0) {
     const secretRooms = dungeon.secretRooms ?? [];
     const room = secretRooms[secretIndex];
     if (!room) return;
-    for (let yy = room.y; yy < room.y + room.h; yy++) {
-      const secretRow = secretFloor[yy], floorRow = dungeon.floor[yy];
+    for (let row = room.gridY; row < room.gridY + room.height; row++) {
+      const secretRow = secretFloor[row], floorRow = dungeon.floor[row];
       if (!secretRow || !floorRow) continue;
-      for (let xx = room.x; xx < room.x + room.w; xx++) {
-        if (secretRow[xx] === 1) { secretRow[xx] = 0; floorRow[xx] = 1; }
+      for (let column = room.gridX; column < room.gridX + room.width; column++) {
+        if (secretRow[column] === 1) { secretRow[column] = 0; floorRow[column] = 1; }
       }
     }
     secretRooms.splice(secretIndex, 1);
     dungeon.rooms.push(room);
-    const inRoom = (mx: number, my: number) => mx >= room.x && mx < room.x + room.w && my >= room.y && my < room.y + room.h;
-    dungeon.markers = dungeon.markers.filter((marker) => !(marker.type === 'secret' && inRoom(marker.x, marker.y)));
-    dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) => !(inRoom(path.x1, path.y1) || inRoom(path.x2, path.y2)));
+    const inRoom = (markerX: number, markerY: number) => markerX >= room.gridX && markerX < room.gridX + room.width && markerY >= room.gridY && markerY < room.gridY + room.height;
+    dungeon.markers = dungeon.markers.filter((marker) => !(marker.type === 'secret' && inRoom(marker.gridX, marker.gridY)));
+    dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) => !(inRoom(path.startX, path.startY) || inRoom(path.endX, path.endY)));
     return;
   }
-  const run = straightRunWhere(x, y, (cx, cy) => isSecretCorridorCell(dungeon, cx, cy)).cells;
+  const run = straightRunWhere(gridX, gridY, (cellX, cellY) => isSecretCorridorCell(dungeon, cellX, cellY)).cells;
   const cleared: Record<number, number> = {};
   run.forEach((cell) => {
     const secretRow = secretFloor[cell[1]], floorRow = dungeon.floor[cell[1]];
@@ -83,7 +83,7 @@ export function unconvertSecret(dungeon: Dungeon, x: number, y: number): void {
     if (floorRow) floorRow[cell[0]] = 1;
     cleared[cell[1] * gridWidth + cell[0]] = 1;
   });
-  dungeon.markers = dungeon.markers.filter((marker) => !(marker.type === 'secret' && cleared[marker.y * gridWidth + marker.x]));
+  dungeon.markers = dungeon.markers.filter((marker) => !(marker.type === 'secret' && cleared[marker.gridY * gridWidth + marker.gridX]));
   dungeon.secretPaths = (dungeon.secretPaths ?? []).filter((path) =>
-    (secretFloor[path.y1]?.[path.x1] === 1) || (secretFloor[path.y2]?.[path.x2] === 1));
+    (secretFloor[path.startY]?.[path.startX] === 1) || (secretFloor[path.endY]?.[path.endX] === 1));
 }

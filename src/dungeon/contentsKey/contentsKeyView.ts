@@ -43,7 +43,7 @@ export function renderContentsKey(annotations: AnnotationEntry[], dungeon: Dunge
   }
   function boxFor(entry: AnnotationEntry): HTMLElement {
     const holder = document.createElement('div');
-    holder.innerHTML = '<div class="ck-box"><div class="ck-letter">' + escapeHtml(entry.feature.ref) + '</div>' +
+    holder.innerHTML = '<div class="ck-box"><div class="ck-letter">' + escapeHtml(entry.feature.referenceLabel) + '</div>' +
       '<div class="ck-body"><div class="ck-type">' + escapeHtml(entryLabel(dungeon, entry)) + '</div>' +
       '<div class="ck-text">' + escapeHtml(entry.feature.note ?? '') + '</div></div></div>';
     const box = holder.firstChild as HTMLElement;
@@ -51,7 +51,7 @@ export function renderContentsKey(annotations: AnnotationEntry[], dungeon: Dunge
     // user-authored label, so it is applied as an attribute — never as markup.
     box.setAttribute('role', 'button');
     box.setAttribute('tabindex', '0');
-    box.setAttribute('aria-label', 'Edit entry ' + (entry.feature.ref ?? '') + ': ' + entryLabel(dungeon, entry));
+    box.setAttribute('aria-label', 'Edit entry ' + (entry.feature.referenceLabel ?? '') + ': ' + entryLabel(dungeon, entry));
     return box;
   }
 

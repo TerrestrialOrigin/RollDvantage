@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = resolve(here, 'fixtures/seed-c0ffee.dungeon');
+const V1_FIXTURE = resolve(here, 'fixtures/seed-c0ffee-v1.dungeon');
 const MISSING_TALLY_FIXTURE = resolve(here, 'fixtures/missing-tally.dungeon');
 
 /* ============================================================
@@ -37,6 +38,20 @@ test('loads a fixture dungeon deterministically', async ({ page }) => {
   const playerMarkers = await page.locator('#player-map .mk').count();
   expect(dmMarkers).toBeGreaterThan(playerMarkers);
   expect(playerMarkers).toBeGreaterThanOrEqual(1); // entrance always on player map
+});
+
+test('loads a legacy version-1 file through migration and stays fully editable', async ({ page }) => {
+  // The retained v1 (abbreviated gw/gh, x/y/w/h, x1..y2) fixture must migrate to the
+  // current full-name schema at the load boundary and render identically to the v2 file.
+  await page.setInputFiles('#file-load', V1_FIXTURE);
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
+  await expect(page.locator('#dm-map svg.dmap')).toBeVisible();
+  await expect(page.locator('#dm-map .walls')).toHaveCount(1);
+  // A secret (S) badge from the migrated secret path is present and editable.
+  await expect(page.locator('#dm-map .mk')).not.toHaveCount(0);
+  // Re-saving emits the current schema (no abbreviated keys) — proven by a clean re-load.
+  await page.setInputFiles('#file-load', FIXTURE);
+  await expect(page.locator('#dungeon-name-dm')).toHaveText('The Mansion');
 });
 
 test('generates a "Map only" dungeon from the New menu', async ({ page }) => {

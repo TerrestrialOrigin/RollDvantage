@@ -74,9 +74,9 @@ describe('persistence', () => {
     localStorage.setItem(PREFIX + 'pageSize', JSON.stringify({ w: 8.5, h: 14, unit: 'in' }));
     expect(loadPersisted(PREFIX)).toEqual({ width: 8.5, height: 14, unit: 'in' });
   });
-  it('keeps writing the legacy storage shape so older builds can read it back', () => {
+  it('writes the current full-name storage shape ({width,height,unit})', () => {
     savePersisted(PREFIX, { width: 8.5, height: 11, unit: 'in' });
-    expect(JSON.parse(localStorage.getItem(PREFIX + 'pageSize')!)).toEqual({ w: 8.5, h: 11, unit: 'in' });
+    expect(JSON.parse(localStorage.getItem(PREFIX + 'pageSize')!)).toEqual({ width: 8.5, height: 11, unit: 'in' });
   });
   it('returns null for a missing value', () => {
     expect(loadPersisted(PREFIX)).toBeNull();

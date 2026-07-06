@@ -10,8 +10,7 @@
 export type Unit = 'in' | 'mm';
 export interface PageSize { width: number; height: number; unit: Unit; }
 
-/** Common presets. Persisted sizes use the compact legacy `{w,h,unit}` shape —
-    see loadPersisted/savePersisted, the only places that shape exists. */
+/** Common presets. */
 export const PRESETS: Record<string, PageSize> & { letter: PageSize; a4: PageSize; legal: PageSize } = {
   letter: { width: 8.5, height: 11, unit: 'in' },
   a4: { width: 210, height: 297, unit: 'mm' },
@@ -60,23 +59,24 @@ export function defaultForLocale(locale: string): PageSize {
 function storageKey(prefix: string): string { return prefix + 'pageSize'; }
 
 /** Read a persisted size, defensively — corrupt/invalid values yield null.
-    The stored payload keeps the legacy compact `{w,h,unit}` keys so sizes
-    saved before the width/height rename still restore. */
+    The current payload uses full-name `{width,height,unit}` keys; a legacy
+    compact `{w,h,unit}` payload saved before the rename is read-migrated
+    transparently (new keys win, legacy keys are the fallback). */
 export function loadPersisted(prefix: string): PageSize | null {
   try {
     const raw = localStorage.getItem(storageKey(prefix));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { w?: unknown; h?: unknown; unit?: unknown };
+    const parsed = JSON.parse(raw) as { width?: unknown; height?: unknown; w?: unknown; h?: unknown; unit?: unknown };
     if (typeof parsed !== 'object' || parsed === null) return null;
     const unit: Unit = parsed.unit === 'mm' ? 'mm' : 'in';
-    return validateCustom(parsed.w, parsed.h, unit);
+    return validateCustom(parsed.width ?? parsed.w, parsed.height ?? parsed.h, unit);
   } catch {
     return null;
   }
 }
 
 export function savePersisted(prefix: string, size: PageSize): void {
-  const stored = { w: size.width, h: size.height, unit: size.unit };   // legacy storage shape, byte-compatible
+  const stored = { width: size.width, height: size.height, unit: size.unit };
   try { localStorage.setItem(storageKey(prefix), JSON.stringify(stored)); } catch { /* storage unavailable */ }
 }
 

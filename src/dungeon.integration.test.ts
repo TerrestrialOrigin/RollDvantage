@@ -18,21 +18,21 @@ function assertRenderableContract(dungeon: ReturnType<typeof generateDungeon>) {
   expect(typeof dungeon.flavor).toBe('string');
 
   expect(dungeon.grid).toBeTruthy();
-  expect(typeof dungeon.grid.gw).toBe('number');
-  expect(typeof dungeon.grid.gh).toBe('number');
-  expect(typeof dungeon.grid.cell).toBe('number');
+  expect(typeof dungeon.grid.width).toBe('number');
+  expect(typeof dungeon.grid.height).toBe('number');
+  expect(typeof dungeon.grid.cellSize).toBe('number');
 
-  // floor is a gh x gw matrix of 0/1 cells
+  // floor is a height x width matrix of 0/1 cells
   expect(Array.isArray(dungeon.floor)).toBe(true);
-  expect(dungeon.floor.length).toBe(dungeon.grid.gh);
-  expect(dungeon.floor[0]?.length).toBe(dungeon.grid.gw);
+  expect(dungeon.floor.length).toBe(dungeon.grid.height);
+  expect(dungeon.floor[0]?.length).toBe(dungeon.grid.width);
 
-  // markers carry the type/x/y the symbol() renderer switches on
+  // markers carry the type/gridX/gridY the symbol() renderer switches on
   expect(Array.isArray(dungeon.markers)).toBe(true);
   dungeon.markers.forEach((marker) => {
     expect(typeof marker.type).toBe('string');
-    expect(typeof marker.x).toBe('number');
-    expect(typeof marker.y).toBe('number');
+    expect(typeof marker.gridX).toBe('number');
+    expect(typeof marker.gridY).toBe('number');
   });
 
   // tally drives the count panel

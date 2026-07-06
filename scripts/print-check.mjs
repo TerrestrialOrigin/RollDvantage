@@ -91,7 +91,7 @@ async function firefoxChecks() {
   record('Firefox: one sheet per section', ffPages === sections, `${ffPages} sheets / ${sections} sections`);
   // header is stacked (regression guard: the depth line must not also carry the dungeon name)
   const text = execSync(`pdftotext -f 1 -l 1 "${out}" - 2>/dev/null`).toString();
-  const depthLine = text.split('\n').find((l) => /depth/i.test(l)) || '';
+  const depthLine = text.split('\n').find((line) => /depth/i.test(line)) || '';
   record('Firefox: header stacked (depth over name)', /depth/i.test(depthLine) && !/mansion/i.test(depthLine), JSON.stringify(depthLine.trim()));
   // full-page border present: content reaches within ~0.7in of every sheet edge
   execSync(`pdftoppm -png -r 70 -f 1 -l 1 "${out}" "${TMP}/ff"`);

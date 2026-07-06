@@ -49,14 +49,14 @@ export function refBadge(centerX: number, centerY: number, letter: string): stri
 }
 
 /** The glyph for a marker, optionally with its reference badge. */
-export function symbol(marker: { type: MarkerType; dir?: Direction; ref?: string }, centerX: number, centerY: number): string {
+export function symbol(marker: { type: MarkerType; direction?: Direction; referenceLabel?: string }, centerX: number, centerY: number): string {
   let glyph = '';
   switch (marker.type) {
     case 'entrance':
-      glyph = triangle(centerX, centerY, marker.dir!, 8, GOLD);
+      glyph = triangle(centerX, centerY, marker.direction!, 8, GOLD);
       break;
     case 'exit':
-      glyph = triangle(centerX, centerY, OPPOSITE_DIRECTION[marker.dir!] || 'up', 8, 'none', INK, 2);
+      glyph = triangle(centerX, centerY, OPPOSITE_DIRECTION[marker.direction!] || 'up', 8, 'none', INK, 2);
       break;
     case 'trap':
       glyph = '<circle cx="' + centerX + '" cy="' + centerY + '" r="7.5" fill="' + GHALO + '" stroke="' + INK + '" stroke-width="1.8"/>' +
@@ -85,15 +85,15 @@ export function symbol(marker: { type: MarkerType; dir?: Direction; ref?: string
         '<rect x="' + (centerX - 7.5) + '" y="' + (centerY - 7.5) + '" width="15" height="15" fill="oklch(0.9 0.03 84)" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
       break;
   }
-  if (marker.ref) glyph += refBadge(centerX + (marker.type === 'boss' ? 14 : 12), centerY - (marker.type === 'boss' ? 13 : 11), marker.ref);
+  if (marker.referenceLabel) glyph += refBadge(centerX + (marker.type === 'boss' ? 14 : 12), centerY - (marker.type === 'boss' ? 13 : 11), marker.referenceLabel);
   return '<g class="mk">' + glyph + '</g>';
 }
 
 /** The demo marker each preview icon shows, per type (entrance & exit
     triangles both point up). One exported map (M6) — used by `iconSVG` and
     the toolbar's static legend icons. */
-export const MARKER_PREVIEW_SPECS: Record<MarkerType, { type: MarkerType; dir?: Direction }> = {
-  entrance: { type: 'entrance', dir: 'up' }, exit: { type: 'exit', dir: 'down' },
+export const MARKER_PREVIEW_SPECS: Record<MarkerType, { type: MarkerType; direction?: Direction }> = {
+  entrance: { type: 'entrance', direction: 'up' }, exit: { type: 'exit', direction: 'down' },
   trap: { type: 'trap' }, monster: { type: 'monster' }, boss: { type: 'boss' },
   treasure: { type: 'treasure' }, secret: { type: 'secret' }, other: { type: 'other' },
 };

@@ -20,7 +20,7 @@ export function cellAtClient(dungeon: Dungeon, clientX: number, clientY: number)
 }
 
 /** Cell under a client point, clamped to the grid bounds. */
-export function clampedCellAtClient(dungeon: Dungeon, clientX: number, clientY: number): { x: number; y: number } | null {
+export function clampedCellAtClient(dungeon: Dungeon, clientX: number, clientY: number): { gridX: number; gridY: number } | null {
   const svg = dmSvg();
   if (!svg) return null;
   return cellClamped(dungeon.grid, svg.getBoundingClientRect(), clientX, clientY);

@@ -11,14 +11,14 @@ import type { Dungeon } from '../model/types';
 function fixtureDungeon(): Dungeon {
   return {
     seed: 3, name: 'BBox Fixture', depth: 'Depth 1',
-    grid: { width: 5, height: 4, cell: 24 },
+    grid: { width: 5, height: 4, cellSize: 24 },
     floor: [
       [0, 0, 0, 0, 0],
       [0, 1, 0, 1, 1],
       [0, 0, 0, 1, 1],
       [0, 0, 0, 0, 0],
     ],
-    rooms: [{ x: 3, y: 1, w: 2, h: 2, id: 1 }],
+    rooms: [{ gridX: 3, gridY: 1, width: 2, height: 2, id: 1 }],
     markers: [],
     tally: { rooms: 1, foes: 0, traps: 0, loot: 0, secret: 0 },
   };

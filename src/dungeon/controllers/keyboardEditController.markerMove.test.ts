@@ -11,7 +11,7 @@ import { migrateDungeon } from '../persistence/dungeonFile';
 import { attachKeyboardEditController } from './keyboardEditController';
 import type { StructureModeHandles } from './structureModeController';
 import type { ControllerContext, ModeState } from './types';
-import type { Dungeon, ExternalDungeon, Marker } from '../model/types';
+import type { Dungeon, Marker } from '../model/types';
 
 function memStore(): { getItem(key: string): string | null; setItem(key: string, value: string): void } {
   const data: Record<string, string> = {};
@@ -32,7 +32,7 @@ function realStack(dungeon?: Dungeon): Stack {
   const store = new DungeonStore(history, memStore());
   const editor = createDungeonEditor(store, history);
   editor.loadFromJson(dungeon ?? migrateDungeon(
-    JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'full'))) as ExternalDungeon));
+    JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'full')))));
   const modes: ModeState = { current: null, selectedMarkerType: null };
   const structureModes: StructureModeHandles = { setMode: vi.fn(), updateModeHint: vi.fn(), detach: vi.fn() };
   const openNoteAtCell: Mock<(cellX: number, cellY: number) => void> = vi.fn();
@@ -48,22 +48,22 @@ function realStack(dungeon?: Dungeon): Stack {
 }
 
 /** A placeable floor cell not occupied by any marker. */
-function placeableCell(dungeon: Dungeon, skip = new Set<string>()): { x: number; y: number } {
-  const occupied = new Set(dungeon.markers.map((marker) => marker.x + ',' + marker.y));
-  for (let y = 0; y < dungeon.grid.height; y++) {
-    for (let x = 0; x < dungeon.grid.width; x++) {
-      const key = x + ',' + y;
-      if (dungeon.floor[y]?.[x] === 1 && !occupied.has(key) && !skip.has(key)) return { x, y };
+function placeableCell(dungeon: Dungeon, skip = new Set<string>()): { gridX: number; gridY: number } {
+  const occupied = new Set(dungeon.markers.map((marker) => marker.gridX + ',' + marker.gridY));
+  for (let gridY = 0; gridY < dungeon.grid.height; gridY++) {
+    for (let gridX = 0; gridX < dungeon.grid.width; gridX++) {
+      const key = gridX + ',' + gridY;
+      if (dungeon.floor[gridY]?.[gridX] === 1 && !occupied.has(key) && !skip.has(key)) return { gridX, gridY };
     }
   }
   throw new Error('no placeable cell in fixture');
 }
 
 /** A non-floor (empty) cell. */
-function emptyCell(dungeon: Dungeon): { x: number; y: number } {
-  for (let y = 0; y < dungeon.grid.height; y++) {
-    for (let x = 0; x < dungeon.grid.width; x++) {
-      if (dungeon.floor[y]?.[x] !== 1) return { x, y };
+function emptyCell(dungeon: Dungeon): { gridX: number; gridY: number } {
+  for (let gridY = 0; gridY < dungeon.grid.height; gridY++) {
+    for (let gridX = 0; gridX < dungeon.grid.width; gridX++) {
+      if (dungeon.floor[gridY]?.[gridX] !== 1) return { gridX, gridY };
     }
   }
   throw new Error('no empty cell in fixture');
@@ -83,11 +83,11 @@ function press(key: string, init: KeyboardEventInit = {}): void {
 }
 
 /** Walk the cell cursor from anywhere to an exact grid cell (clamp then step). */
-function walkTo(dungeon: Dungeon, x: number, y: number): void {
+function walkTo(dungeon: Dungeon, gridX: number, gridY: number): void {
   for (let step = 0; step < dungeon.grid.width; step++) press('ArrowLeft');
   for (let step = 0; step < dungeon.grid.height; step++) press('ArrowUp');
-  for (let step = 0; step < x; step++) press('ArrowRight');
-  for (let step = 0; step < y; step++) press('ArrowDown');
+  for (let step = 0; step < gridX; step++) press('ArrowRight');
+  for (let step = 0; step < gridY; step++) press('ArrowDown');
 }
 
 beforeEach(() => { document.body.innerHTML = ''; });
@@ -97,19 +97,19 @@ describe('keyboard marker move', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const origin = placeableCell(dungeon);
-    stack.editor.addMarker('monster', origin.x, origin.y);
+    stack.editor.addMarker('monster', origin.gridX, origin.gridY);
     const index = stack.getDungeon().markers.length - 1;
-    const destination = placeableCell(stack.getDungeon(), new Set([origin.x + ',' + origin.y]));
+    const destination = placeableCell(stack.getDungeon(), new Set([origin.gridX + ',' + origin.gridY]));
     const moveSpy = vi.spyOn(stack.editor, 'moveMarker');
 
-    walkTo(stack.getDungeon(), origin.x, origin.y);
+    walkTo(stack.getDungeon(), origin.gridX, origin.gridY);
     press('m');
-    walkTo(stack.getDungeon(), destination.x, destination.y);
+    walkTo(stack.getDungeon(), destination.gridX, destination.gridY);
     press('Enter');
 
-    expect(moveSpy).toHaveBeenCalledWith(index, destination.x, destination.y);
+    expect(moveSpy).toHaveBeenCalledWith(index, destination.gridX, destination.gridY);
     const marker = stack.getDungeon().markers[index]!;
-    expect({ x: marker.x, y: marker.y }).toEqual(destination);
+    expect({ gridX: marker.gridX, gridY: marker.gridY }).toEqual(destination);
     expect(stack.getDungeon().markers).toHaveLength(index + 1);   // moved, not duplicated
   });
 
@@ -117,21 +117,21 @@ describe('keyboard marker move', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const origin = placeableCell(dungeon);
-    stack.editor.addMarker('monster', origin.x, origin.y);
+    stack.editor.addMarker('monster', origin.gridX, origin.gridY);
     const index = stack.getDungeon().markers.length - 1;
     const marker = stack.getDungeon().markers[index]!;
     stack.editor.setNote(marker, stack.getDungeon().markers, 'guardian', 'The Guardian');
-    const destination = placeableCell(stack.getDungeon(), new Set([origin.x + ',' + origin.y]));
+    const destination = placeableCell(stack.getDungeon(), new Set([origin.gridX + ',' + origin.gridY]));
 
-    walkTo(stack.getDungeon(), origin.x, origin.y);
+    walkTo(stack.getDungeon(), origin.gridX, origin.gridY);
     press('m');
-    walkTo(stack.getDungeon(), destination.x, destination.y);
+    walkTo(stack.getDungeon(), destination.gridX, destination.gridY);
     press('Enter');
 
     const moved = stack.getDungeon().markers[index]!;
     expect(moved.note).toBe('guardian');
     expect(moved.label).toBe('The Guardian');
-    expect({ x: moved.x, y: moved.y }).toEqual(destination);
+    expect({ gridX: moved.gridX, gridY: moved.gridY }).toEqual(destination);
   });
 
   it('m on an empty (marker-less) cell picks nothing up — Enter falls through to annotate', () => {
@@ -140,51 +140,51 @@ describe('keyboard marker move', () => {
     const empty = placeableCell(dungeon);           // floor, no marker
     const moveSpy = vi.spyOn(stack.editor, 'moveMarker');
 
-    walkTo(dungeon, empty.x, empty.y);
+    walkTo(dungeon, empty.gridX, empty.gridY);
     press('m');                                     // nothing to grab
     press('Enter');                                 // no tool, not holding -> annotate
 
     expect(moveSpy).not.toHaveBeenCalled();
-    expect(stack.openNoteAtCell).toHaveBeenCalledWith(empty.x, empty.y);
+    expect(stack.openNoteAtCell).toHaveBeenCalledWith(empty.gridX, empty.gridY);
   });
 
   it('dropping a held marker on a non-placeable cell is denied (no move)', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const origin = placeableCell(dungeon);
-    stack.editor.addMarker('monster', origin.x, origin.y);
+    stack.editor.addMarker('monster', origin.gridX, origin.gridY);
     const index = stack.getDungeon().markers.length - 1;
     const empty = emptyCell(stack.getDungeon());
     const moveSpy = vi.spyOn(stack.editor, 'moveMarker');
 
-    walkTo(stack.getDungeon(), origin.x, origin.y);
+    walkTo(stack.getDungeon(), origin.gridX, origin.gridY);
     press('m');
-    walkTo(stack.getDungeon(), empty.x, empty.y);
+    walkTo(stack.getDungeon(), empty.gridX, empty.gridY);
     press('Enter');                                 // denied — empty cell is not placeable
 
     expect(moveSpy).not.toHaveBeenCalled();
     const marker = stack.getDungeon().markers[index]!;
-    expect({ x: marker.x, y: marker.y }).toEqual(origin);   // unchanged, still at origin
+    expect({ gridX: marker.gridX, gridY: marker.gridY }).toEqual(origin);   // unchanged, still at origin
   });
 
   it('Escape while holding cancels the pickup (a later Enter no longer moves)', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const origin = placeableCell(dungeon);
-    stack.editor.addMarker('monster', origin.x, origin.y);
+    stack.editor.addMarker('monster', origin.gridX, origin.gridY);
     const index = stack.getDungeon().markers.length - 1;
-    const destination = placeableCell(stack.getDungeon(), new Set([origin.x + ',' + origin.y]));
+    const destination = placeableCell(stack.getDungeon(), new Set([origin.gridX + ',' + origin.gridY]));
     const moveSpy = vi.spyOn(stack.editor, 'moveMarker');
 
-    walkTo(stack.getDungeon(), origin.x, origin.y);
+    walkTo(stack.getDungeon(), origin.gridX, origin.gridY);
     press('m');
     press('Escape');                                // cancel the pickup
-    walkTo(stack.getDungeon(), destination.x, destination.y);
+    walkTo(stack.getDungeon(), destination.gridX, destination.gridY);
     press('Enter');                                 // not holding anymore
 
     expect(moveSpy).not.toHaveBeenCalled();
     const marker = stack.getDungeon().markers[index]!;
-    expect({ x: marker.x, y: marker.y }).toEqual(origin);
+    expect({ gridX: marker.gridX, gridY: marker.gridY }).toEqual(origin);
   });
 });
 
@@ -193,11 +193,11 @@ describe('keyboard marker retype', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const cell = placeableCell(dungeon);
-    stack.editor.addMarker('monster', cell.x, cell.y);
+    stack.editor.addMarker('monster', cell.gridX, cell.gridY);
     const index = stack.getDungeon().markers.length - 1;
     const retypeSpy = vi.spyOn(stack.editor, 'retypeMarker');
 
-    walkTo(stack.getDungeon(), cell.x, cell.y);
+    walkTo(stack.getDungeon(), cell.gridX, cell.gridY);
     press('t');                                     // monster -> boss
     expect(retypeSpy).toHaveBeenLastCalledWith(index, 'boss');
     expect(stack.getDungeon().markers[index]!.type).toBe('boss');
@@ -215,7 +215,7 @@ describe('keyboard marker retype', () => {
     const empty = placeableCell(dungeon);
     const retypeSpy = vi.spyOn(stack.editor, 'retypeMarker');
 
-    walkTo(dungeon, empty.x, empty.y);
+    walkTo(dungeon, empty.gridX, empty.gridY);
     press('t');
 
     expect(retypeSpy).not.toHaveBeenCalled();
@@ -237,7 +237,7 @@ function twoCorridorDungeon(): Dungeon {
   if (runB) runB[1] = runB[2] = runB[3] = 1;                  // run B: (1..3, 4)
   return {
     seed: 1, name: 'Secret Test', depth: 'Depth 1',
-    grid: { width: gridWidth, height: gridHeight, cell: 24 },
+    grid: { width: gridWidth, height: gridHeight, cellSize: 24 },
     floor, rooms: [], markers: [],
     tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 0 },
   };
@@ -249,22 +249,22 @@ function secretBadge(dungeon: Dungeon): Marker | undefined {
 }
 
 /** Make run A (row 1) secret and return the resulting (S) badge's cell. */
-function secretRunA(stack: Stack): { x: number; y: number } {
+function secretRunA(stack: Stack): { gridX: number; gridY: number } {
   stack.editor.makeSecret(2, 1);                              // any cell of run A
   const badge = secretBadge(stack.getDungeon());
   if (!badge) throw new Error('makeSecret did not place an (S) badge');
-  return { x: badge.x, y: badge.y };
+  return { gridX: badge.gridX, gridY: badge.gridY };
 }
 
 describe('keyboard secret (S) badge move', () => {
   it('keyboard-moving the (S) badge to a convertible corridor moves the SECRET, not the raw badge', () => {
     const stack = setup(twoCorridorDungeon());
     const badge = secretRunA(stack);
-    const destination = { x: 2, y: 4 };                        // a cell of the still-visible run B
+    const destination = { gridX: 2, gridY: 4 };                        // a cell of the still-visible run B
 
-    walkTo(stack.getDungeon(), badge.x, badge.y);
+    walkTo(stack.getDungeon(), badge.gridX, badge.gridY);
     press('m');
-    walkTo(stack.getDungeon(), destination.x, destination.y);
+    walkTo(stack.getDungeon(), destination.gridX, destination.gridY);
     press('Enter');
 
     const dungeon = stack.getDungeon();
@@ -272,30 +272,30 @@ describe('keyboard secret (S) badge move', () => {
     expect(badges).toHaveLength(1);                            // still exactly one badge (relocated, not duplicated)
     const moved = badges[0]!;
     // the badge sits on secret floor (its position IS the secret status) — broken today
-    expect(dungeon.secretFloor?.[moved.y]?.[moved.x]).toBe(1);
+    expect(dungeon.secretFloor?.[moved.gridY]?.[moved.gridX]).toBe(1);
     // run B became secret; run A returned to visible floor with no orphan badge
-    expect(dungeon.secretFloor?.[destination.y]?.[destination.x]).toBe(1);
-    expect(dungeon.floor[badge.y]?.[badge.x]).toBe(1);
-    expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(0);
+    expect(dungeon.secretFloor?.[destination.gridY]?.[destination.gridX]).toBe(1);
+    expect(dungeon.floor[badge.gridY]?.[badge.gridX]).toBe(1);
+    expect(dungeon.secretFloor?.[badge.gridY]?.[badge.gridX]).toBe(0);
   });
 
   it('keyboard-dropping the (S) badge on an already-secret cell leaves the secret untouched', () => {
     const stack = setup(twoCorridorDungeon());
     const badge = secretRunA(stack);
     // another cell of run A — placeable (secret floor) but NOT convertible (already secret)
-    const alreadySecret = { x: badge.x === 1 ? 3 : 1, y: 1 };
+    const alreadySecret = { gridX: badge.gridX === 1 ? 3 : 1, gridY: 1 };
 
-    walkTo(stack.getDungeon(), badge.x, badge.y);
+    walkTo(stack.getDungeon(), badge.gridX, badge.gridY);
     press('m');
-    walkTo(stack.getDungeon(), alreadySecret.x, alreadySecret.y);
+    walkTo(stack.getDungeon(), alreadySecret.gridX, alreadySecret.gridY);
     press('Enter');
 
     const dungeon = stack.getDungeon();
     const badges = dungeon.markers.filter((marker) => marker.type === 'secret');
     expect(badges).toHaveLength(1);
     // the badge did NOT relocate — it stays at its original midpoint (moved today)
-    expect({ x: badges[0]!.x, y: badges[0]!.y }).toEqual(badge);
-    expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(1);
+    expect({ gridX: badges[0]!.gridX, gridY: badges[0]!.gridY }).toEqual(badge);
+    expect(dungeon.secretFloor?.[badge.gridY]?.[badge.gridX]).toBe(1);
   });
 });
 
@@ -305,14 +305,14 @@ describe('keyboard secret (S) badge retype', () => {
     const badge = secretRunA(stack);
     const retypeSpy = vi.spyOn(stack.editor, 'retypeMarker');
 
-    walkTo(stack.getDungeon(), badge.x, badge.y);
+    walkTo(stack.getDungeon(), badge.gridX, badge.gridY);
     press('t');
 
     expect(retypeSpy).not.toHaveBeenCalled();
     const dungeon = stack.getDungeon();
-    const atBadge = dungeon.markers.find((marker) => marker.x === badge.x && marker.y === badge.y);
+    const atBadge = dungeon.markers.find((marker) => marker.gridX === badge.gridX && marker.gridY === badge.gridY);
     expect(atBadge?.type).toBe('secret');                      // still a secret badge (becomes 'boss' today)
-    expect(dungeon.secretFloor?.[badge.y]?.[badge.x]).toBe(1); // secret floor intact
+    expect(dungeon.secretFloor?.[badge.gridY]?.[badge.gridX]).toBe(1); // secret floor intact
   });
 });
 
@@ -325,14 +325,14 @@ describe('keyboard context menu open', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const cell = placeableCell(dungeon);
-    stack.editor.addMarker('monster', cell.x, cell.y);
+    stack.editor.addMarker('monster', cell.gridX, cell.gridY);
 
-    walkTo(stack.getDungeon(), cell.x, cell.y);
+    walkTo(stack.getDungeon(), cell.gridX, cell.gridY);
     press('ContextMenu');
 
     expect(stack.openContextMenu).toHaveBeenCalledTimes(1);
     const call = stack.openContextMenu.mock.calls[0]!;
-    expect([call[0], call[1]]).toEqual([cell.x, cell.y]);      // opened at the cursor's grid cell
+    expect([call[0], call[1]]).toEqual([cell.gridX, cell.gridY]);      // opened at the cursor's grid cell
     expect(typeof call[2]).toBe('number');                     // a client point was supplied
     expect(typeof call[3]).toBe('number');
   });
@@ -341,14 +341,14 @@ describe('keyboard context menu open', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const cell = placeableCell(dungeon);
-    stack.editor.addMarker('monster', cell.x, cell.y);
+    stack.editor.addMarker('monster', cell.gridX, cell.gridY);
 
-    walkTo(stack.getDungeon(), cell.x, cell.y);
+    walkTo(stack.getDungeon(), cell.gridX, cell.gridY);
     press('F10', { shiftKey: true });
 
     expect(stack.openContextMenu).toHaveBeenCalledTimes(1);
     const call = stack.openContextMenu.mock.calls[0]!;
-    expect([call[0], call[1]]).toEqual([cell.x, cell.y]);
+    expect([call[0], call[1]]).toEqual([cell.gridX, cell.gridY]);
   });
 
   it('the menu opens at the cursor even on an empty cell — openContextMenu itself no-ops off-feature', () => {
@@ -359,30 +359,30 @@ describe('keyboard context menu open', () => {
     const dungeon = stack.getDungeon();
     const empty = emptyCell(dungeon);
 
-    walkTo(dungeon, empty.x, empty.y);
+    walkTo(dungeon, empty.gridX, empty.gridY);
     press('ContextMenu');
 
-    expect(stack.openContextMenu).toHaveBeenCalledWith(empty.x, empty.y, expect.any(Number), expect.any(Number));
+    expect(stack.openContextMenu).toHaveBeenCalledWith(empty.gridX, empty.gridY, expect.any(Number), expect.any(Number));
   });
 
   it('opening the menu while a marker is held cancels the hold AND opens the menu', () => {
     const stack = setup();
     const dungeon = stack.getDungeon();
     const cell = placeableCell(dungeon);
-    stack.editor.addMarker('monster', cell.x, cell.y);
+    stack.editor.addMarker('monster', cell.gridX, cell.gridY);
     const index = stack.getDungeon().markers.length - 1;
-    const destination = placeableCell(stack.getDungeon(), new Set([cell.x + ',' + cell.y]));
+    const destination = placeableCell(stack.getDungeon(), new Set([cell.gridX + ',' + cell.gridY]));
     const moveSpy = vi.spyOn(stack.editor, 'moveMarker');
 
-    walkTo(stack.getDungeon(), cell.x, cell.y);
+    walkTo(stack.getDungeon(), cell.gridX, cell.gridY);
     press('m');                                                 // pick the marker up
     press('ContextMenu');                                       // opening cancels the hold
     expect(stack.openContextMenu).toHaveBeenCalledTimes(1);
 
     // the hold was released: a later Enter at another cell must NOT move the marker
-    walkTo(stack.getDungeon(), destination.x, destination.y);
+    walkTo(stack.getDungeon(), destination.gridX, destination.gridY);
     press('Enter');
     expect(moveSpy).not.toHaveBeenCalled();
-    expect({ x: stack.getDungeon().markers[index]!.x, y: stack.getDungeon().markers[index]!.y }).toEqual(cell);
+    expect({ gridX: stack.getDungeon().markers[index]!.gridX, gridY: stack.getDungeon().markers[index]!.gridY }).toEqual(cell);
   });
 });

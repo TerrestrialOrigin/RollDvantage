@@ -4,27 +4,27 @@ import { commitRoom, commitDelete } from './structureOps';
 import { migrateDungeon } from '../persistence/dungeonFile';
 import { convertSecretAt, unconvertSecret } from './secretOps';
 import { applyNote, removeNote } from './noteOps';
-import type { Dungeon, ExternalDungeon } from '../model/types';
+import type { Dungeon } from '../model/types';
 
 function freshDungeon(): Dungeon {
-  return migrateDungeon(JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'detailed'))) as ExternalDungeon);
+  return migrateDungeon(JSON.parse(JSON.stringify(generateDungeon(0xc0ffee, 3, 'detailed'))));
 }
 
 describe('structureOps', () => {
   it('commitRoom adds floor and a room record with a new id', () => {
-    const dungeon = { grid: { width: 5, height: 5, cell: 20 }, floor: Array.from({ length: 5 }, () => new Array<number>(5).fill(0)), rooms: [], markers: [] } as unknown as Dungeon;
+    const dungeon = { grid: { width: 5, height: 5, cellSize: 20 }, floor: Array.from({ length: 5 }, () => new Array<number>(5).fill(0)), rooms: [], markers: [] } as unknown as Dungeon;
     commitRoom(dungeon, 1, 1, 2, 2);
     expect(dungeon.floor[1]?.[1]).toBe(1);
     expect(dungeon.floor[2]?.[2]).toBe(1);
     expect(dungeon.rooms).toHaveLength(1);
-    expect(dungeon.rooms[0]).toMatchObject({ x: 1, y: 1, w: 2, h: 2, id: 1 });
+    expect(dungeon.rooms[0]).toMatchObject({ gridX: 1, gridY: 1, width: 2, height: 2, id: 1 });
   });
 
   it('commitRoom assigns max-existing-id + 1 for non-contiguous room ids (M9)', () => {
     const dungeon = {
-      grid: { width: 8, height: 8, cell: 20 },
+      grid: { width: 8, height: 8, cellSize: 20 },
       floor: Array.from({ length: 8 }, () => new Array<number>(8).fill(0)),
-      rooms: [{ x: 1, y: 1, w: 1, h: 1, id: 2 }, { x: 4, y: 4, w: 1, h: 1, id: 7 }],
+      rooms: [{ gridX: 1, gridY: 1, width: 1, height: 1, id: 2 }, { gridX: 4, gridY: 4, width: 1, height: 1, id: 7 }],
       markers: [],
     } as unknown as Dungeon;
     commitRoom(dungeon, 6, 6, 6, 6);
@@ -34,10 +34,10 @@ describe('structureOps', () => {
 
   it('commitDelete clears floor and drops orphaned rooms + markers', () => {
     const dungeon = {
-      grid: { width: 4, height: 4, cell: 20 },
+      grid: { width: 4, height: 4, cellSize: 20 },
       floor: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 0, 0]],
-      rooms: [{ x: 1, y: 1, w: 2, h: 2, id: 1 }],
-      markers: [{ type: 'monster', x: 1, y: 1 }],
+      rooms: [{ gridX: 1, gridY: 1, width: 2, height: 2, id: 1 }],
+      markers: [{ type: 'monster', gridX: 1, gridY: 1 }],
       secretPaths: [], corridorNotes: [],
     } as unknown as Dungeon;
     commitDelete(dungeon, 1, 1, 2, 2);
@@ -55,7 +55,7 @@ function corridorDungeon(): Dungeon {
   if (corridorRow) corridorRow[1] = corridorRow[2] = corridorRow[3] = corridorRow[4] = 1;
   return {
     seed: 1, name: 'Corridor Test', depth: 'Depth 1',
-    grid: { width: gridWidth, height: gridHeight, cell: 24 },
+    grid: { width: gridWidth, height: gridHeight, cellSize: 24 },
     floor, rooms: [], markers: [],
     tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 0 },
   };
@@ -72,7 +72,7 @@ describe('secretOps — corridor conversion round-trip (M9)', () => {
       expect(dungeon.floor[2]?.[x]).toBe(0);
       expect(dungeon.secretFloor?.[2]?.[x]).toBe(1);
     }
-    expect(dungeon.secretPaths).toEqual([{ x1: 1, y1: 2, x2: 4, y2: 2 }]);
+    expect(dungeon.secretPaths).toEqual([{ startX: 1, startY: 2, endX: 4, endY: 2 }]);
     expect(dungeon.markers.filter((marker) => marker.type === 'secret')).toHaveLength(1);
 
     unconvertSecret(dungeon, 2, 2);
@@ -97,12 +97,12 @@ describe('commitDelete — secret cleanup (M9)', () => {
     if (secretRowFour) secretRowFour[1] = secretRowFour[2] = secretRowFour[3] = 1; // secret passage
     const dungeon = {
       seed: 2, name: 'Secret Cleanup', depth: 'Depth 1',
-      grid: { width: gridWidth, height: gridHeight, cell: 24 },
+      grid: { width: gridWidth, height: gridHeight, cellSize: 24 },
       floor, secretFloor,
       rooms: [],
-      secretRooms: [{ x: 1, y: 1, w: 2, h: 2, id: 1 }],
-      secretPaths: [{ x1: 1, y1: 4, x2: 3, y2: 4 }],
-      markers: [{ type: 'secret', x: 2, y: 4, placed: true }],
+      secretRooms: [{ gridX: 1, gridY: 1, width: 2, height: 2, id: 1 }],
+      secretPaths: [{ startX: 1, startY: 4, endX: 3, endY: 4 }],
+      markers: [{ type: 'secret', gridX: 2, gridY: 4, placed: true }],
       tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 2 },
     } as unknown as Dungeon;
 
@@ -121,11 +121,11 @@ describe('secretOps — convert/unconvert are inverse', () => {
     const room = dungeon.rooms[0];
     expect(room).toBeDefined();
     if (!room) return;
-    const cx = room.x, cy = room.y;
-    convertSecretAt(dungeon, cx, cy);
+    const originX = room.gridX, originY = room.gridY;
+    convertSecretAt(dungeon, originX, originY);
     // it left the visible rooms / moved to secret
     expect(dungeon.secretRooms!.length).toBeGreaterThanOrEqual(1);
-    unconvertSecret(dungeon, cx, cy);
+    unconvertSecret(dungeon, originX, originY);
     // structure restored
     const original = JSON.parse(before) as Dungeon;
     expect(JSON.stringify(dungeon.floor)).toBe(JSON.stringify(original.floor));
@@ -135,25 +135,25 @@ describe('secretOps — convert/unconvert are inverse', () => {
 
 describe('noteOps', () => {
   it('applies a note and assigns a sequence', () => {
-    const dungeon = { _seq: 0, markers: [] } as unknown as Dungeon;
-    const target = { } as { note?: string; seq?: number; label?: string };
+    const dungeon = { _sequence: 0, markers: [] } as unknown as Dungeon;
+    const target = { } as { note?: string; sequence?: number; label?: string };
     const result = applyNote(dungeon, target, null, 'a trap here', 'Trap Room');
     expect(result).toBe('saved');
-    expect(target).toMatchObject({ note: 'a trap here', label: 'Trap Room', seq: 0 });
-    expect(dungeon._seq).toBe(1);
+    expect(target).toMatchObject({ note: 'a trap here', label: 'Trap Room', sequence: 0 });
+    expect(dungeon._sequence).toBe(1);
   });
 
   it('clearing title and note removes the annotation', () => {
-    const dungeon = { _seq: 1, markers: [] } as unknown as Dungeon;
-    const target = { note: 'x', label: 'y', seq: 0, ref: 'A' } as Record<string, unknown>;
+    const dungeon = { _sequence: 1, markers: [] } as unknown as Dungeon;
+    const target = { note: 'x', label: 'y', sequence: 0, ref: 'A' } as Record<string, unknown>;
     const result = applyNote(dungeon, target, null, '', '');
     expect(result).toBe('removed');
     expect(target.note).toBeUndefined();
-    expect(target.ref).toBeUndefined();
+    expect(target.referenceLabel).toBeUndefined();
   });
 
   it('removeNote detaches a loose note from its list', () => {
-    const target = { note: 'x', seq: 1 } as Record<string, unknown>;
+    const target = { note: 'x', sequence: 1 } as Record<string, unknown>;
     const list = [target];
     removeNote(target, list);
     expect(list).toHaveLength(0);
