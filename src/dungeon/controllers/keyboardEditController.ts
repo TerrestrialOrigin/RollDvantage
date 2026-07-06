@@ -27,7 +27,7 @@ export interface KeyboardEditDeps extends ControllerContext {
   openContextMenu: (gridX: number, gridY: number, clientX: number, clientY: number) => void;
 }
 
-interface CellPosition { x: number; y: number; }
+interface CellPosition { gridX: number; gridY: number; }
 
 /** The rectangle/corridor anchor remembers which mode set it, so a mode switch
     (mouse click on a mode button) invalidates it instead of committing across modes. */
@@ -63,8 +63,8 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
 
   function clampToGrid(dungeon: Dungeon, position: CellPosition): CellPosition {
     return {
-      x: Math.max(0, Math.min(dungeon.grid.width - 1, position.x)),
-      y: Math.max(0, Math.min(dungeon.grid.height - 1, position.y)),
+      gridX: Math.max(0, Math.min(dungeon.grid.width - 1, position.gridX)),
+      gridY: Math.max(0, Math.min(dungeon.grid.height - 1, position.gridY)),
     };
   }
 
@@ -78,15 +78,15 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     const dungeon = getDungeon();
     if (!cursor || !dungeon) return;
     cursor = clampToGrid(dungeon, cursor);
-    const cell = dungeon.grid.cell;
+    const cellSize = dungeon.grid.cellSize;
     const group = document.createElementNS(SVG_NS, 'g');
     group.setAttribute('id', 'kbd-cursor');
     const rect = document.createElementNS(SVG_NS, 'rect');
     rect.setAttribute('class', heldMarker !== null ? 'kbd-cursor holding' : 'kbd-cursor');
-    rect.setAttribute('x', String(cursor.x * cell));
-    rect.setAttribute('y', String(cursor.y * cell));
-    rect.setAttribute('width', String(cell));
-    rect.setAttribute('height', String(cell));
+    rect.setAttribute('x', String(cursor.gridX * cellSize));
+    rect.setAttribute('y', String(cursor.gridY * cellSize));
+    rect.setAttribute('width', String(cellSize));
+    rect.setAttribute('height', String(cellSize));
     group.appendChild(rect);
     svg.appendChild(group);
   }
@@ -102,17 +102,17 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
       client→cell math in grid.ts (cellFromClient), so the keyboard-opened context
       menu anchors exactly where a pointer click on that cell would have. Null only
       when the map SVG is not yet rendered. */
-  function clientPointForCell(dungeon: Dungeon, cell: CellPosition): { clientX: number; clientY: number } | null {
+  function clientPointForCell(dungeon: Dungeon, position: CellPosition): { clientX: number; clientY: number } | null {
     const svg = dmSvg();
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
-    const contentWidth = dungeon.grid.width * dungeon.grid.cell;
-    const contentHeight = dungeon.grid.height * dungeon.grid.cell;
+    const contentWidth = dungeon.grid.width * dungeon.grid.cellSize;
+    const contentHeight = dungeon.grid.height * dungeon.grid.cellSize;
     const scaleX = contentWidth ? rect.width / contentWidth : 0;
     const scaleY = contentHeight ? rect.height / contentHeight : 0;
     return {
-      clientX: rect.left + (cell.x + 0.5) * dungeon.grid.cell * scaleX,
-      clientY: rect.top + (cell.y + 0.5) * dungeon.grid.cell * scaleY,
+      clientX: rect.left + (position.gridX + 0.5) * dungeon.grid.cellSize * scaleX,
+      clientY: rect.top + (position.gridY + 0.5) * dungeon.grid.cellSize * scaleY,
     };
   }
 
@@ -131,13 +131,13 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
 
   // ---- live-region status (shares #mode-hint with the structure controller) ----
   function describeCell(dungeon: Dungeon, position: CellPosition): string {
-    const markerIndex = markerAtCell(dungeon, position.x, position.y);
+    const markerIndex = markerAtCell(dungeon, position.gridX, position.gridY);
     const marker = markerIndex >= 0 ? dungeon.markers[markerIndex] : undefined;
     if (marker) return marker.type + ' marker';
-    if (roomIndexAt(dungeon, position.x, position.y) >= 0) return 'room';
-    if (isCorridorCell(dungeon, position.x, position.y)) return 'corridor';
-    if (isBaseFloor(dungeon, position.x, position.y)) return 'floor';
-    if (dungeon.secretFloor?.[position.y]?.[position.x] === 1) return 'secret floor';
+    if (roomIndexAt(dungeon, position.gridX, position.gridY) >= 0) return 'room';
+    if (isCorridorCell(dungeon, position.gridX, position.gridY)) return 'corridor';
+    if (isBaseFloor(dungeon, position.gridX, position.gridY)) return 'floor';
+    if (dungeon.secretFloor?.[position.gridY]?.[position.gridX] === 1) return 'secret floor';
     return 'empty';
   }
 
@@ -156,11 +156,11 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     const dungeon = getDungeon();
     if (!element || !cursor || !dungeon) return;
     const cellDescription = describeCell(dungeon, cursor);
-    let text = 'Row ' + (cursor.y + 1) + ', column ' + (cursor.x + 1) + ' — '
+    let text = 'Row ' + (cursor.gridY + 1) + ', column ' + (cursor.gridX + 1) + ' — '
       + cellDescription + '. ' + actionHint();
     // With no tool/mode active and a marker under the cursor, surface the move/retype gestures.
     if (heldMarker === null && !modes.current && !modes.selectedMarkerType) {
-      const markerIndex = markerAtCell(dungeon, cursor.x, cursor.y);
+      const markerIndex = markerAtCell(dungeon, cursor.gridX, cursor.gridY);
       const marker = markerIndex >= 0 ? dungeon.markers[markerIndex] : undefined;
       // the (S) badge can be moved (it relocates the secret) but never retyped.
       if (marker?.type === 'secret') text += ' M to move the secret.';
@@ -188,30 +188,30 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
   }
 
   function previewFromAnchor(dungeon: Dungeon, active: PendingAnchor, target: CellPosition): void {
-    const cell = dungeon.grid.cell;
-    if (active.mode === 'room') drawRoomPreview(cell, active.x, active.y, target.x, target.y);
-    else if (active.mode === 'delete') drawDeletePreview(cell, active.x, active.y, target.x, target.y);
-    else drawCorridorPreview(cell, corridorCells(active.x, active.y, target.x, target.y));
+    const cellSize = dungeon.grid.cellSize;
+    if (active.mode === 'room') drawRoomPreview(cellSize, active.gridX, active.gridY, target.gridX, target.gridY);
+    else if (active.mode === 'delete') drawDeletePreview(cellSize, active.gridX, active.gridY, target.gridX, target.gridY);
+    else drawCorridorPreview(cellSize, corridorCells(active.gridX, active.gridY, target.gridX, target.gridY));
   }
 
   // ---- Enter/Space dispatch ----
   function placeSelectedMarker(dungeon: Dungeon, type: MarkerType, position: CellPosition): void {
-    if (!placeable(dungeon, position.x, position.y)) return;   // same denial rule as pointer drop
-    if (type === 'secret') { editor.makeSecret(position.x, position.y); return; }
-    editor.addMarker(type, position.x, position.y);
+    if (!placeable(dungeon, position.gridX, position.gridY)) return;   // same denial rule as pointer drop
+    if (type === 'secret') { editor.makeSecret(position.gridX, position.gridY); return; }
+    editor.addMarker(type, position.gridX, position.gridY);
   }
 
   // ---- keyboard marker move (pick up / drop) — mirrors the pointer drag-to-move ----
   function grabMarker(dungeon: Dungeon, position: CellPosition): void {
     if (modes.current || heldMarker !== null) return;          // structure mode owns the surface; no nested grab
-    const index = markerAtCell(dungeon, position.x, position.y);
+    const index = markerAtCell(dungeon, position.gridX, position.gridY);
     if (index < 0) return;                                     // nothing under the cursor to pick up
     heldMarker = index;
   }
 
   function dropHeldMarker(dungeon: Dungeon, position: CellPosition): void {
     if (heldMarker === null) return;
-    if (!placeable(dungeon, position.x, position.y)) return;   // denied drop: stay held for another attempt
+    if (!placeable(dungeon, position.gridX, position.gridY)) return;   // denied drop: stay held for another attempt
     const index = heldMarker;
     const marker = dungeon.markers[index];
     if (marker?.type === 'secret') {
@@ -219,17 +219,17 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
       // the raw badge (mirrors the pointer path in dragPlaceController.onUp). Dropping
       // always ends the hold; an ineligible destination leaves the secret untouched.
       heldMarker = null;
-      const alreadySecret = dungeon.secretFloor?.[position.y]?.[position.x] === 1;
+      const alreadySecret = dungeon.secretFloor?.[position.gridY]?.[position.gridX] === 1;
       const canConvert = !alreadySecret
-        && (roomIndexAt(dungeon, position.x, position.y) >= 0 || isCorridorCell(dungeon, position.x, position.y));
+        && (roomIndexAt(dungeon, position.gridX, position.gridY) >= 0 || isCorridorCell(dungeon, position.gridX, position.gridY));
       if (canConvert) {
-        editor.unmakeSecret(marker.x, marker.y);   // restore the origin room/passage
-        editor.makeSecret(position.x, position.y); // make the dropped-on room/corridor secret
+        editor.unmakeSecret(marker.gridX, marker.gridY);   // restore the origin room/passage
+        editor.makeSecret(position.gridX, position.gridY); // make the dropped-on room/corridor secret
       }
       return;
     }
     heldMarker = null;
-    editor.moveMarker(index, position.x, position.y);          // preserves note/label; re-derives entrance/exit dir
+    editor.moveMarker(index, position.gridX, position.gridY);          // preserves note/label; re-derives entrance/exit dir
   }
 
   function cancelHeld(): void { heldMarker = null; }
@@ -237,7 +237,7 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
   // ---- keyboard marker retype — cycle the type via the same verb the context menu uses ----
   function retypeAtCursor(dungeon: Dungeon, position: CellPosition, direction: 1 | -1): void {
     if (modes.current || heldMarker !== null) return;          // not while a mode is active or a marker is held
-    const index = markerAtCell(dungeon, position.x, position.y);
+    const index = markerAtCell(dungeon, position.gridX, position.gridY);
     const marker = index >= 0 ? dungeon.markers[index] : undefined;
     if (!marker) return;
     if (marker.type === 'secret') return;   // the (S) badge is a status indicator, never a cyclable type (matches featureAt)
@@ -262,45 +262,45 @@ export function attachKeyboardEditController(deps: KeyboardEditDeps): void {
     // exactly like a pointer right-click there. The menu focuses its first item, which
     // blurs the map — guard that blur so the cursor survives the round-trip.
     openingMenu = true;
-    openContextMenu(position.x, position.y, point.clientX, point.clientY);
+    openContextMenu(position.gridX, position.gridY, point.clientX, point.clientY);
     openingMenu = false;
   }
 
   function actInStructureMode(dungeon: Dungeon, mode: Exclude<EditMode, null>, position: CellPosition): void {
     const active = validAnchor();
     if (!active) {
-      if (mode === 'corridor' && !isBaseFloor(dungeon, position.x, position.y)) return;   // corridors start on existing floor
-      anchor = { mode, x: position.x, y: position.y };
+      if (mode === 'corridor' && !isBaseFloor(dungeon, position.gridX, position.gridY)) return;   // corridors start on existing floor
+      anchor = { mode, gridX: position.gridX, gridY: position.gridY };
       previewFromAnchor(dungeon, anchor, position);
       return;
     }
     const start = active;
     dropAnchor();
-    if (mode === 'room') editor.addRoom(start.x, start.y, position.x, position.y);
-    else if (mode === 'delete') editor.deleteRegion(start.x, start.y, position.x, position.y);
-    else editor.addCorridor(start.x, start.y, position.x, position.y);
+    if (mode === 'room') editor.addRoom(start.gridX, start.gridY, position.gridX, position.gridY);
+    else if (mode === 'delete') editor.deleteRegion(start.gridX, start.gridY, position.gridX, position.gridY);
+    else editor.addCorridor(start.gridX, start.gridY, position.gridX, position.gridY);
   }
 
   function actAtCursor(dungeon: Dungeon, position: CellPosition): void {
     if (modes.current) { actInStructureMode(dungeon, modes.current, position); return; }
     if (modes.selectedMarkerType) { placeSelectedMarker(dungeon, modes.selectedMarkerType, position); return; }
-    openNoteAtCell(position.x, position.y);
+    openNoteAtCell(position.gridX, position.gridY);
   }
 
   // ---- key handling (keydown on the focused wrapper only, so text fields
   //      elsewhere on the page are never hijacked) ----
   const ARROW_DELTAS: Record<string, CellPosition> = {
-    ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+    ArrowLeft: { gridX: -1, gridY: 0 }, ArrowRight: { gridX: 1, gridY: 0 }, ArrowUp: { gridX: 0, gridY: -1 }, ArrowDown: { gridX: 0, gridY: 1 },
   };
 
   function ensureCursor(dungeon: Dungeon): CellPosition {
-    cursor ??= clampToGrid(dungeon, { x: Math.floor(dungeon.grid.width / 2), y: Math.floor(dungeon.grid.height / 2) });
+    cursor ??= clampToGrid(dungeon, { gridX: Math.floor(dungeon.grid.width / 2), gridY: Math.floor(dungeon.grid.height / 2) });
     return cursor;
   }
 
   function moveCursor(dungeon: Dungeon, delta: CellPosition): void {
     const position = ensureCursor(dungeon);
-    cursor = clampToGrid(dungeon, { x: position.x + delta.x, y: position.y + delta.y });
+    cursor = clampToGrid(dungeon, { gridX: position.gridX + delta.gridX, gridY: position.gridY + delta.gridY });
     paintCursor();
     const active = validAnchor();
     if (active) previewFromAnchor(dungeon, active, cursor);

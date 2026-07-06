@@ -43,7 +43,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     elementKind.classList.add('editable');
     elementKind.setAttribute('data-ph', rawLabel(dungeon, { feature: target, kind }));   // placeholder = default label
     elementKind.textContent = target.label ?? '';
-    elementRef.textContent = target.ref ?? letterFor(annotations.length);
+    elementRef.textContent = target.referenceLabel ?? letterFor(annotations.length);
     elementText.value = target.note ?? '';
     elementDelete.style.display = (target.note || target.label) ? '' : 'none';
     dialogSession = openDialog({
@@ -68,9 +68,9 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     closeNote();
   }
 
-  function findAnnotationByRef(ref: string): AnnotationEntry | null {
+  function findAnnotationByReferenceLabel(referenceLabel: string): AnnotationEntry | null {
     const annotations = relabel(getDungeon());
-    for (const entry of annotations) { if (entry.feature.ref === ref) return entry; }
+    for (const entry of annotations) { if (entry.feature.referenceLabel === referenceLabel) return entry; }
     return null;
   }
 
@@ -85,8 +85,8 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
     if (isBaseFloor(dungeon, cellX, cellY) || (dungeon.secretFloor?.[cellY]?.[cellX] === 1)) {
       dungeon.corridorNotes ??= [];
       let existing: CorridorNote | null = null;
-      for (const note of dungeon.corridorNotes) { if (note.x === cellX && note.y === cellY) { existing = note; break; } }
-      openNote(existing ?? { x: cellX, y: cellY } as CorridorNote, 'corridor', dungeon.corridorNotes);
+      for (const note of dungeon.corridorNotes) { if (note.gridX === cellX && note.gridY === cellY) { existing = note; break; } }
+      openNote(existing ?? { gridX: cellX, gridY: cellY } as CorridorNote, 'corridor', dungeon.corridorNotes);
     }
   }
 
@@ -97,7 +97,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
       const dungeon = getDungeon();
       const svg = dmSvg(); if (!svg || !dungeon) return;
       const cell = cellAtClient(dungeon, event.clientX, event.clientY); if (!cell?.inside) return;
-      openNoteAtCell(cell.x, cell.y);
+      openNoteAtCell(cell.gridX, cell.gridY);
     });
   }
 
@@ -106,7 +106,7 @@ export function attachNoteModalController(context: ControllerContext): NoteModal
   function activateContentsKeyBox(box: Element): void {
     const dungeon = getDungeon(); if (!dungeon) return;
     const letterElement = box.querySelector('.ck-letter'); if (!letterElement) return;
-    const entry = findAnnotationByRef((letterElement.textContent || '').trim()); if (!entry) return;
+    const entry = findAnnotationByReferenceLabel((letterElement.textContent || '').trim()); if (!entry) return;
     openNote(entry.feature, entry.kind, entry.kind === 'corridor' ? dungeon.corridorNotes! : null);
   }
   if (ckContainer) {

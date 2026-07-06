@@ -205,7 +205,7 @@ describe('History snapshot isolation (M9)', () => {
     const undone = history.undo()!;
     expect(undone.name).toBe('a');
     undone.name = 'corrupted';
-    undone.markers.push({ type: 'monster', x: 0, y: 0 });
+    undone.markers.push({ type: 'monster', gridX: 0, gridY: 0 });
 
     expect(history.redo()!.name).toBe('b');
     const backAgain = history.undo()!;

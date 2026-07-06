@@ -28,70 +28,47 @@ export type FloorGrid = number[][];
 export interface Grid {
   width: number;
   height: number;
-  cell: number;
+  cellSize: number;
 }
-
-/** The grid as the external schema spells it (generator output and `.dungeon`
-    files use abbreviated keys). Confined to the persistence/adoption boundary,
-    where `migrateDungeon` maps it to the internal `Grid`. */
-export interface ExternalGrid {
-  gw: number;
-  gh: number;
-  cell: number;
-}
-
-/** A dungeon as it exists outside the app (file on disk / generator output):
-    identical to `Dungeon` except for the abbreviated grid schema. */
-export type ExternalDungeon = Omit<Dungeon, 'grid'> & { grid: ExternalGrid };
 
 /** Fields shared by anything that can carry a Contents-Key annotation. */
 export interface Annotatable {
-  ref?: string;
+  referenceLabel?: string;
   note?: string;
   label?: string;
-  seq?: number;
+  sequence?: number;
 }
 
 export interface Marker extends Annotatable {
   type: MarkerType;
-  x: number;
-  y: number;
-  dir?: Direction;
+  gridX: number;
+  gridY: number;
+  direction?: Direction;
   placed?: boolean;
 }
 
 export interface Room extends Annotatable {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  cx?: number;
-  cy?: number;
+  gridX: number;
+  gridY: number;
+  width: number;
+  height: number;
+  centerX?: number;
+  centerY?: number;
   id?: number;
 }
 
 /** Secret passage centerline (current schema). Load-time migration guarantees
     this shape everywhere past the persistence boundary. */
 export interface SecretPath {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
-/** Legacy L-schema secret passage, accepted only at the load boundary and
-    migrated to straight SecretPath segments by `migrateDungeon`. */
-export interface LegacySecretPath {
-  ax: number;
-  ay: number;
-  bx: number;
-  by: number;
-  horizFirst?: boolean;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
 }
 
 export interface CorridorNote extends Annotatable {
-  x: number;
-  y: number;
+  gridX: number;
+  gridY: number;
 }
 
 export interface Tally {
@@ -121,7 +98,7 @@ export interface Dungeon {
   corridorNotes?: CorridorNote[];
   tally: Tally;
   /** Monotonic annotation sequence counter (internal). */
-  _seq?: number;
+  _sequence?: number;
 }
 
 /** Options that select what a rendered map reveals. */

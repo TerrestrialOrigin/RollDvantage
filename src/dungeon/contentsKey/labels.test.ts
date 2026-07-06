@@ -10,8 +10,8 @@ describe('contents-key labels', () => {
 
   it('labels a corridor as secret only when on the secret floor', () => {
     const dungeon = { secretFloor: [[0], [1]] } as unknown as Dungeon;
-    expect(rawLabel(dungeon, { feature: { x: 0, y: 0 }, kind: 'corridor' })).toBe('Corridor');
-    expect(rawLabel(dungeon, { feature: { x: 0, y: 1 }, kind: 'corridor' })).toBe('Secret Passage');
+    expect(rawLabel(dungeon, { feature: { gridX: 0, gridY: 0 }, kind: 'corridor' })).toBe('Corridor');
+    expect(rawLabel(dungeon, { feature: { gridX: 0, gridY: 1 }, kind: 'corridor' })).toBe('Secret Passage');
   });
 
   it('prefers a user label over the default', () => {
@@ -22,15 +22,15 @@ describe('contents-key labels', () => {
 
   it('collects annotated features in sequence order and assigns letters', () => {
     const dungeon = {
-      markers: [{ type: 'monster', x: 1, y: 1, note: 'b', seq: 2 }],
-      rooms: [{ x: 0, y: 0, w: 1, h: 1, note: 'a', seq: 1 }],
+      markers: [{ type: 'monster', gridX: 1, gridY: 1, note: 'b', sequence: 2 }],
+      rooms: [{ gridX: 0, gridY: 0, width: 1, height: 1, note: 'a', sequence: 1 }],
       secretRooms: [],
       corridorNotes: [],
     } as unknown as Dungeon;
     const entries = relabel(dungeon);
-    expect(entries.map((e) => e.feature.ref)).toEqual(['A', 'B']);
+    expect(entries.map((e) => e.feature.referenceLabel)).toEqual(['A', 'B']);
     expect(entries[0]?.feature.note).toBe('a'); // seq 1 sorts first
-    expect(dungeon._seq).toBe(3);
+    expect(dungeon._sequence).toBe(3);
   });
 
   it('escapes HTML-significant characters (XSS guard)', () => {

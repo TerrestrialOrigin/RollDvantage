@@ -61,9 +61,9 @@ export function createDungeonEditor(store: DungeonStore, history: History, seedS
     store.refresh();
   }
 
-  function applyEdgeDir(dungeon: Dungeon, type: MarkerType, x: number, y: number): { type: MarkerType; x: number; y: number; placed: true; dir?: ReturnType<typeof edgeDir> } {
-    const marker: { type: MarkerType; x: number; y: number; placed: true; dir?: ReturnType<typeof edgeDir> } = { type, x, y, placed: true };
-    if (type === 'entrance' || type === 'exit') marker.dir = edgeDir(dungeon.grid, x, y);
+  function applyEdgeDir(dungeon: Dungeon, type: MarkerType, gridX: number, gridY: number): { type: MarkerType; gridX: number; gridY: number; placed: true; direction?: ReturnType<typeof edgeDir> } {
+    const marker: { type: MarkerType; gridX: number; gridY: number; placed: true; direction?: ReturnType<typeof edgeDir> } = { type, gridX, gridY, placed: true };
+    if (type === 'entrance' || type === 'exit') marker.direction = edgeDir(dungeon.grid, gridX, gridY);
     return marker;
   }
 
@@ -83,12 +83,12 @@ export function createDungeonEditor(store: DungeonStore, history: History, seedS
       edit((dungeon) => { dungeon.markers.push(applyEdgeDir(dungeon, type, x, y)); });
     },
 
-    moveMarker(index, x, y): void {
+    moveMarker(index, gridX, gridY): void {
       edit((dungeon) => {
         const marker = dungeon.markers[index];
         if (!marker) return;
-        marker.x = x; marker.y = y;
-        if (marker.type === 'entrance' || marker.type === 'exit') marker.dir = edgeDir(dungeon.grid, x, y);
+        marker.gridX = gridX; marker.gridY = gridY;
+        if (marker.type === 'entrance' || marker.type === 'exit') marker.direction = edgeDir(dungeon.grid, gridX, gridY);
       });
     },
 
@@ -101,7 +101,7 @@ export function createDungeonEditor(store: DungeonStore, history: History, seedS
         const marker = dungeon.markers[index];
         if (!marker) return;
         marker.type = type;
-        if (type === 'entrance' || type === 'exit') marker.dir = edgeDir(dungeon.grid, marker.x, marker.y);
+        if (type === 'entrance' || type === 'exit') marker.direction = edgeDir(dungeon.grid, marker.gridX, marker.gridY);
       });
     },
 

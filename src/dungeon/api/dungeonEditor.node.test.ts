@@ -89,8 +89,8 @@ describe('DungeonEditor runs headless (no DOM)', () => {
     const { editor } = makeEditor();
     editor.loadFromJson(parseDungeonText(legacyJson));
     const loaded = editor.getState().dungeon!;
-    expect(loaded.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]); // migrated
-    expect(loaded.version).toBe(1);
+    expect(loaded.secretPaths).toEqual([{ startX: 1, startY: 3, endX: 3, endY: 3 }]); // migrated to full-name schema
+    expect(loaded.version).toBe(2);
 
     // A consumer of the migrated shape works: unmake the secret passage.
     editor.unmakeSecret(2, 3);

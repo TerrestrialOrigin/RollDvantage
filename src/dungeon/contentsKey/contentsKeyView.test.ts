@@ -4,13 +4,13 @@
    as an attribute, the visible text through escapeHtml(). (jsdom) */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { generateDungeon } from 'auto-stuff-generator';
-import type { Dungeon, ExternalDungeon } from '../model/types';
+import type { Dungeon } from '../model/types';
 import { migrateDungeon } from '../persistence/dungeonFile';
 import { relabel } from './labels';
 import { renderContentsKey } from './contentsKeyView';
 
 function makeAnnotatedDungeon(): Dungeon {
-  const dungeon = migrateDungeon(generateDungeon(0xc0ffee, 3, 'full') as unknown as ExternalDungeon);
+  const dungeon = migrateDungeon(generateDungeon(0xc0ffee, 3, 'full'));
   const firstMarker = dungeon.markers[0];
   if (firstMarker) firstMarker.note = 'A sleeping troll.';
   const firstRoom = dungeon.rooms[0];
@@ -39,7 +39,7 @@ describe('renderContentsKey button semantics', () => {
       const annotation = annotations[index];
       expect(annotation).toBeDefined();
       if (!annotation) return;
-      expect(label).toContain('Edit entry ' + annotation.feature.ref!);
+      expect(label).toContain('Edit entry ' + annotation.feature.referenceLabel!);
     });
   });
 
@@ -75,7 +75,7 @@ describe('renderContentsKey button semantics', () => {
     const first = annotations[0];
     expect(first).toBeDefined();
     if (!first) return;
-    first.feature.ref = '<img id="ref-pwned" src=x onerror="window.__p=1">';
+    first.feature.referenceLabel = '<img id="ref-pwned" src=x onerror="window.__p=1">';
     renderContentsKey(annotations, dungeon);
     expect(document.getElementById('ref-pwned')).toBeNull();
     expect(document.querySelector('#contents-key img')).toBeNull();
@@ -93,7 +93,7 @@ describe('renderContentsKey button semantics', () => {
   });
 
   it('does not invoke onLayoutChange when there is nothing to render', () => {
-    const dungeon = migrateDungeon(generateDungeon(1, 1, 'empty') as unknown as ExternalDungeon);
+    const dungeon = migrateDungeon(generateDungeon(1, 1, 'empty'));
     let layoutChanges = 0;
     renderContentsKey(relabel(dungeon), dungeon, () => { layoutChanges += 1; });
     expect(layoutChanges).toBe(0);

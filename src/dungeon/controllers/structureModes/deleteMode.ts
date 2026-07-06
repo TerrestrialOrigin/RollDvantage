@@ -13,8 +13,8 @@ export function attachDeleteMode(deps: StructureModeModuleDeps): StructureModeMo
   function onPointerMove(event: PointerEvent): void {
     if (!drag) return;
     const cell = clampedCellAtClient(getDungeon()!, event.clientX, event.clientY); if (!cell) return;
-    drag.currentX = cell.x; drag.currentY = cell.y;
-    drawDeletePreview(getDungeon()!.grid.cell, drag.startX, drag.startY, cell.x, cell.y);
+    drag.currentX = cell.gridX; drag.currentY = cell.gridY;
+    drawDeletePreview(getDungeon()!.grid.cellSize, drag.startX, drag.startY, cell.gridX, cell.gridY);
   }
   function onPointerUp(): void {
     window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
@@ -26,8 +26,8 @@ export function attachDeleteMode(deps: StructureModeModuleDeps): StructureModeMo
     if (modes.current !== 'delete' || event.button !== 0) return;
     const cell = clampedCellAtClient(getDungeon()!, event.clientX, event.clientY); if (!cell) return;
     event.preventDefault();
-    drag = { startX: cell.x, startY: cell.y, currentX: cell.x, currentY: cell.y };
-    drawDeletePreview(getDungeon()!.grid.cell, cell.x, cell.y, cell.x, cell.y);
+    drag = { startX: cell.gridX, startY: cell.gridY, currentX: cell.gridX, currentY: cell.gridY };
+    drawDeletePreview(getDungeon()!.grid.cellSize, cell.gridX, cell.gridY, cell.gridX, cell.gridY);
     window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp);
   }
   dmWrap.addEventListener('pointerdown', onPointerDown);

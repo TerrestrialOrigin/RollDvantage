@@ -3,33 +3,37 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { generateDungeon } from 'auto-stuff-generator';
 import { serializeDungeon, dungeonFilename, parseDungeonText, isValidDungeon, migrateDungeon, DUNGEON_SCHEMA_VERSION, InvalidDungeonFileError } from './dungeonFile';
-import type { Dungeon, ExternalDungeon } from '../model/types';
+import type { Dungeon } from '../model/types';
 
-/** Raw generator output — the external schema (`grid.gw/gh`), pre-adoption. */
-function generated(mode: 'empty' | 'full' | 'detailed' = 'full'): ExternalDungeon {
-  return JSON.parse(JSON.stringify(generateDungeon(42, 2, mode))) as ExternalDungeon;
+const V2_FIXTURE = join(__dirname, '../../../e2e/fixtures/seed-c0ffee.dungeon');
+const V1_FIXTURE = join(__dirname, '../../../e2e/fixtures/seed-c0ffee-v1.dungeon');
+
+/** Raw generator output — `auto-stuff-generator@0.5.0` emits the current full-name schema. */
+function generated(mode: 'empty' | 'full' | 'detailed' = 'full'): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(generateDungeon(42, 2, mode))) as Record<string, unknown>;
 }
 
-/** Generator output taken through the adoption boundary (internal schema). */
+/** Generator output taken through the adoption boundary (stamps the current version). */
 function adopted(mode: 'empty' | 'full' | 'detailed' = 'full'): Dungeon {
   return migrateDungeon(generated(mode));
 }
 
-/** A minimal hand-built current-schema dungeon that must always validate. */
+/** A minimal hand-built current (full-name) schema dungeon that must always validate. */
 function minimalDungeon(): Record<string, unknown> {
   return {
     seed: 7,
     name: 'Tiny Vault',
     depth: 'Depth 1',
-    grid: { gw: 3, gh: 2, cell: 24 },
+    grid: { width: 3, height: 2, cellSize: 24 },
     floor: [[0, 1, 0], [0, 1, 0]],
-    rooms: [{ x: 1, y: 0, w: 1, h: 2 }],
-    markers: [{ type: 'entrance', x: 1, y: 0 }],
+    rooms: [{ gridX: 1, gridY: 0, width: 1, height: 2 }],
+    markers: [{ type: 'entrance', gridX: 1, gridY: 0 }],
     tally: { rooms: 1, foes: 0, traps: 0, loot: 0, secret: 0 },
   };
 }
 
-/** A dungeon in the documented legacy shape: L-schema secretPaths (ax/ay/bx/by/horizFirst). */
+/** A dungeon in the documented version-1 abbreviated schema with an L-schema
+    secretPath (ax/ay/bx/by/horizFirst) — exercises the v1 migration branch. */
 function legacyDungeon(): Record<string, unknown> {
   const gridWidth = 6, gridHeight = 5;
   const floor = Array.from({ length: gridHeight }, () => new Array<number>(gridWidth).fill(0));
@@ -42,13 +46,14 @@ function legacyDungeon(): Record<string, unknown> {
   const secretRowThree = secretFloor[3];
   if (secretRowThree) secretRowThree[1] = secretRowThree[2] = secretRowThree[3] = 1; // a secret run
   return {
+    version: 1,
     seed: 123,
     name: 'Old Keep',
     depth: 'Depth 2',
     grid: { gw: gridWidth, gh: gridHeight, cell: 24 },
     floor,
     rooms: [{ x: 1, y: 1, w: 2, h: 2, id: 1 }],
-    markers: [{ type: 'secret', x: 2, y: 3, placed: true }],
+    markers: [{ type: 'secret', x: 2, y: 3, placed: true, seq: 0, ref: 'A', note: 'hi' }],
     secretFloor,
     secretPaths: [{ ax: 1, ay: 3, bx: 3, by: 3, horizFirst: true }],
     tally: { rooms: 1, foes: 0, traps: 0, loot: 0, secret: 1 },
@@ -62,18 +67,21 @@ describe('dungeon file persistence (pure core)', () => {
     expect(restored).toEqual(dungeon);
   });
 
-  it('serializes the internal grid back to the external gw/gh schema', () => {
+  it('serializes the current full-name schema and stamps version 2', () => {
     const emitted = serializeDungeon(adopted());
-    expect(emitted).toMatch(/"gw":/);
-    expect(emitted).toMatch(/"gh":/);
-    expect(emitted).not.toMatch(/"width":/);
-    expect(emitted).not.toMatch(/"height":/);
+    expect(emitted).toMatch(/"width":/);
+    expect(emitted).toMatch(/"height":/);
+    expect(emitted).toMatch(/"cellSize":/);
+    expect(emitted).toMatch(/"version": 2/);
+    expect(emitted).not.toMatch(/"gw":/);
+    expect(emitted).not.toMatch(/"gh":/);
   });
 
-  it('round-trips the committed E2E fixture byte-for-byte (gw/gh adapter is serialization-neutral)', () => {
-    const fixtureText = readFileSync(join(__dirname, '../../../e2e/fixtures/seed-c0ffee.dungeon'), 'utf8');
+  it('round-trips the committed v2 E2E fixture byte-for-byte', () => {
+    const fixtureText = readFileSync(V2_FIXTURE, 'utf8');
     const loaded = parseDungeonText(fixtureText);
-    expect(loaded.grid).toEqual({ width: 23, height: 25, cell: 24 });
+    expect(loaded.grid).toEqual({ width: 23, height: 25, cellSize: 24 });
+    expect(loaded.version).toBe(DUNGEON_SCHEMA_VERSION);
     expect(serializeDungeon(loaded)).toBe(fixtureText.trimEnd());
   });
 
@@ -93,7 +101,6 @@ describe('structural validation (H4/M3)', () => {
     expect(isValidDungeon(generated('full'))).toBe(true);
     expect(isValidDungeon(generated('detailed'))).toBe(true);
     expect(isValidDungeon(minimalDungeon())).toBe(true);
-    expect(isValidDungeon(legacyDungeon())).toBe(true); // legacy schema validates, then migrates
   });
 
   it('rejects the shapes the old truthy check wrongly accepted', () => {
@@ -110,11 +117,11 @@ describe('structural validation (H4/M3)', () => {
     expect(isValidDungeon({ not: 'a dungeon' })).toBe(false);
     expect(isValidDungeon({ ...minimalDungeon(), seed: '7' })).toBe(false);
     expect(isValidDungeon({ ...minimalDungeon(), seed: Infinity })).toBe(false);
-    expect(isValidDungeon({ ...minimalDungeon(), grid: { gw: '3', gh: 2, cell: 24 } })).toBe(false);
-    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ x: 'a', y: 0, w: 1, h: 2 }] })).toBe(false);
-    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ x: 1, y: 0 }] })).toBe(false); // no type
+    expect(isValidDungeon({ ...minimalDungeon(), grid: { width: '3', height: 2, cellSize: 24 } })).toBe(false);
+    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ gridX: 'a', gridY: 0, width: 1, height: 2 }] })).toBe(false);
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ gridX: 1, gridY: 0 }] })).toBe(false); // no type
     expect(isValidDungeon({ ...minimalDungeon(), corridorNotes: [{ note: 'no coords' }] })).toBe(false);
-    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ x1: 1 }] })).toBe(false); // neither schema
+    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ startX: 1 }] })).toBe(false); // incomplete endpoints
   });
 
   it('rejects a floor that does not match the grid rectangle', () => {
@@ -132,6 +139,9 @@ describe('structural validation (H4/M3)', () => {
     // not slip through and throw a raw TypeError later in rendering.
     const { tally, ...noTally } = minimalDungeon();          // eslint-disable-line @typescript-eslint/no-unused-vars
     expect(() => parseDungeonText(JSON.stringify(noTally))).toThrow(InvalidDungeonFileError);
+    // A v1 abbreviated file missing tally is rejected on the legacy branch too.
+    const { tally: legacyTally, ...legacyNoTally } = legacyDungeon(); // eslint-disable-line @typescript-eslint/no-unused-vars
+    expect(() => parseDungeonText(JSON.stringify(legacyNoTally))).toThrow(InvalidDungeonFileError);
   });
 
   it('rejects files missing required tally/name/depth or with a non-numeric tally count (R3)', () => {
@@ -149,16 +159,16 @@ describe('structural validation (H4/M3)', () => {
   });
 
   it('rejects non-integer or out-of-bounds coordinates (C4-bounds)', () => {
-    // grid is gw:3, gh:2 — anything at or past those bounds, or fractional, is invalid.
-    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: 9999, y: 0 }] })).toBe(false); // off-canvas
-    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: 1.5, y: 0 }] })).toBe(false);  // fractional
-    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: -1, y: 0 }] })).toBe(false);   // negative
-    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', x: 3, y: 0 }] })).toBe(false);    // x === gw
-    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ x: 1, y: 0, w: 3, h: 2 }] })).toBe(false);           // x+w > gw
-    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ x: 0, y: 0, w: 1.5, h: 2 }] })).toBe(false);         // fractional dim
-    expect(isValidDungeon({ ...minimalDungeon(), secretRooms: [{ x: 0, y: 0, w: 4, h: 2 }] })).toBe(false);     // secret room spills
-    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ x1: 0, y1: 0, x2: 99, y2: 0 }] })).toBe(false); // endpoint off-canvas
-    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ x1: 0, y1: 0, x2: 1.5, y2: 0 }] })).toBe(false); // fractional endpoint
+    // grid is width:3, height:2 — anything at or past those bounds, or fractional, is invalid.
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', gridX: 9999, gridY: 0 }] })).toBe(false); // off-canvas
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', gridX: 1.5, gridY: 0 }] })).toBe(false);  // fractional
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', gridX: -1, gridY: 0 }] })).toBe(false);   // negative
+    expect(isValidDungeon({ ...minimalDungeon(), markers: [{ type: 'monster', gridX: 3, gridY: 0 }] })).toBe(false);    // gridX === width
+    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ gridX: 1, gridY: 0, width: 3, height: 2 }] })).toBe(false);  // gridX+width > width
+    expect(isValidDungeon({ ...minimalDungeon(), rooms: [{ gridX: 0, gridY: 0, width: 1.5, height: 2 }] })).toBe(false);// fractional dim
+    expect(isValidDungeon({ ...minimalDungeon(), secretRooms: [{ gridX: 0, gridY: 0, width: 4, height: 2 }] })).toBe(false); // secret room spills
+    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ startX: 0, startY: 0, endX: 99, endY: 0 }] })).toBe(false); // endpoint off-canvas
+    expect(isValidDungeon({ ...minimalDungeon(), secretPaths: [{ startX: 0, startY: 0, endX: 1.5, endY: 0 }] })).toBe(false); // fractional endpoint
   });
 
   it('accepts genuine generator output across modes/seeds/levels and existing fixtures (no over-rejection)', () => {
@@ -167,44 +177,50 @@ describe('structural validation (H4/M3)', () => {
         expect(isValidDungeon(JSON.parse(JSON.stringify(generateDungeon(seed, level, mode))))).toBe(true);
       }
     }
-    const fixtureText = readFileSync(join(__dirname, '../../../e2e/fixtures/seed-c0ffee.dungeon'), 'utf8');
-    expect(isValidDungeon(JSON.parse(fixtureText))).toBe(true);
+    expect(isValidDungeon(JSON.parse(readFileSync(V2_FIXTURE, 'utf8')))).toBe(true);
     expect(isValidDungeon(minimalDungeon())).toBe(true);
-    expect(isValidDungeon(legacyDungeon())).toBe(true);
   });
 });
 
-describe('legacy migration (H4)', () => {
-  it('migrates a straight legacy path to a single modern segment and stamps the version', () => {
-    const migrated = migrateDungeon(JSON.parse(JSON.stringify(legacyDungeon())) as ExternalDungeon);
+describe('version-1 → current migration (Directive 2 file format v2)', () => {
+  it('maps a v1 abbreviated file field-by-field to the current schema and stamps version 2', () => {
+    const migrated = parseDungeonText(JSON.stringify(legacyDungeon()));
     expect(migrated.version).toBe(DUNGEON_SCHEMA_VERSION);
-    expect(migrated.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]);
+    expect(migrated.grid).toEqual({ width: 6, height: 5, cellSize: 24 });
+    expect(migrated.rooms[0]).toEqual({ gridX: 1, gridY: 1, width: 2, height: 2, id: 1 });
+    expect(migrated.markers[0]).toEqual({ type: 'secret', gridX: 2, gridY: 3, placed: true, sequence: 0, referenceLabel: 'A', note: 'hi' });
+    expect(JSON.stringify(migrated)).not.toMatch(/"gw"|"gh"|"cell"|"\bx\b"|"dir"|"seq"|"ref"|"x1"/);
+  });
+
+  it('migrates a straight legacy L-path to a single modern segment', () => {
+    const migrated = parseDungeonText(JSON.stringify(legacyDungeon()));
+    expect(migrated.secretPaths).toEqual([{ startX: 1, startY: 3, endX: 3, endY: 3 }]);
   });
 
   it('splits an L-shaped legacy path into one modern segment per leg', () => {
     const base = legacyDungeon();
-    const horizFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: true }] } as unknown as ExternalDungeon);
+    const horizFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: true }] });
     expect(horizFirst.secretPaths).toEqual([
-      { x1: 0, y1: 0, x2: 2, y2: 0 }, // horizontal leg first
-      { x1: 2, y1: 0, x2: 2, y2: 2 }, // then vertical leg
+      { startX: 0, startY: 0, endX: 2, endY: 0 }, // horizontal leg first
+      { startX: 2, startY: 0, endX: 2, endY: 2 }, // then vertical leg
     ]);
-    const vertFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: false }] } as unknown as ExternalDungeon);
+    const vertFirst = migrateDungeon({ ...base, secretPaths: [{ ax: 0, ay: 0, bx: 2, by: 2, horizFirst: false }] });
     expect(vertFirst.secretPaths).toEqual([
-      { x1: 0, y1: 0, x2: 0, y2: 2 }, // vertical leg first
-      { x1: 0, y1: 2, x2: 2, y2: 2 }, // then horizontal leg
+      { startX: 0, startY: 0, endX: 0, endY: 2 }, // vertical leg first
+      { startX: 0, startY: 2, endX: 2, endY: 2 }, // then horizontal leg
     ]);
   });
 
-  it('passes modern paths through unchanged', () => {
+  it('passes a v1 straight path through to the renamed modern form', () => {
     const modern = { ...legacyDungeon(), secretPaths: [{ x1: 1, y1: 3, x2: 3, y2: 3 }] };
-    const migrated = migrateDungeon(JSON.parse(JSON.stringify(modern)) as ExternalDungeon);
-    expect(migrated.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]);
+    const migrated = migrateDungeon(JSON.parse(JSON.stringify(modern)));
+    expect(migrated.secretPaths).toEqual([{ startX: 1, startY: 3, endX: 3, endY: 3 }]);
   });
 
-  it('parseDungeonText delivers legacy files already migrated', () => {
+  it('parseDungeonText delivers legacy files already migrated with no abbreviated keys', () => {
     const loaded = parseDungeonText(JSON.stringify(legacyDungeon()));
     expect(loaded.version).toBe(DUNGEON_SCHEMA_VERSION);
-    expect(loaded.secretPaths).toEqual([{ x1: 1, y1: 3, x2: 3, y2: 3 }]);
+    expect(loaded.secretPaths).toEqual([{ startX: 1, startY: 3, endX: 3, endY: 3 }]);
     expect(JSON.stringify(loaded)).not.toMatch(/"ax"|"horizFirst"/);
   });
 
@@ -212,6 +228,15 @@ describe('legacy migration (H4)', () => {
     const loaded = parseDungeonText(JSON.stringify(legacyDungeon()));
     const emitted = serializeDungeon(loaded);
     expect(emitted).not.toMatch(/"ax"|"ay"|"bx"|"by"|"horizFirst"/);
-    expect(emitted).toContain('"version"');
+    expect(emitted).toMatch(/"version": 2/);
+  });
+
+  it('the retained v1 fixture migrates to the identical model as the v2 fixture (round-trip proof)', () => {
+    const fromV1 = parseDungeonText(readFileSync(V1_FIXTURE, 'utf8'));
+    const fromV2 = parseDungeonText(readFileSync(V2_FIXTURE, 'utf8'));
+    expect(fromV1).toEqual(fromV2);
+    // v1 → internal → save(v2) → load → deep-equal internal
+    const reloaded = parseDungeonText(serializeDungeon(fromV1));
+    expect(reloaded).toEqual(fromV1);
   });
 });

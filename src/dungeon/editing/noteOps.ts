@@ -7,11 +7,11 @@
    ============================================================ */
 import type { Dungeon, Annotatable } from '../model/types';
 
-/** Strip a note/label/seq/ref from a target and detach it from a loose list. */
+/** Strip a note/label/sequence/referenceLabel from a target and detach it from a loose list. */
 export function removeNote(target: Annotatable, list: Annotatable[] | null): void {
   delete target.note;
-  delete target.seq;
-  delete target.ref;
+  delete target.sequence;
+  delete target.referenceLabel;
   delete target.label;
   if (list) { const index = list.indexOf(target); if (index >= 0) list.splice(index, 1); }
 }
@@ -27,7 +27,7 @@ export function applyNote(dungeon: Dungeon, target: Annotatable, list: Annotatab
   if (label) target.label = label; else delete target.label; // blank title -> falls back to the default
   if (!text && !label) { removeNote(target, list); return 'removed'; } // nothing at all -> drop the entry
   target.note = text;
-  if (target.seq == null) { target.seq = dungeon._seq ?? 0; dungeon._seq = (dungeon._seq ?? 0) + 1; }
+  if (target.sequence == null) { target.sequence = dungeon._sequence ?? 0; dungeon._sequence = (dungeon._sequence ?? 0) + 1; }
   if (list && !list.includes(target)) list.push(target); // loose notes join their list on save
   return 'saved';
 }

@@ -28,7 +28,7 @@ function openRowDungeon(): Dungeon {
   if (row) for (let x = 0; x < gridWidth; x++) row[x] = 1;    // whole row is placeable floor
   return {
     seed: 1, name: 'Stale Target Test', depth: 'Depth 1',
-    grid: { width: gridWidth, height: gridHeight, cell: 24 },
+    grid: { width: gridWidth, height: gridHeight, cellSize: 24 },
     floor, rooms: [], markers: [],
     tally: { rooms: 0, foes: 0, traps: 0, loot: 0, secret: 0 },
   };
@@ -72,11 +72,11 @@ const dmWrap = (): HTMLElement => document.getElementById('dm-map')!;
 function press(key: string, init: KeyboardEventInit = {}): void {
   dmWrap().dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }));
 }
-function walkTo(dungeon: Dungeon, x: number, y: number): void {
+function walkTo(dungeon: Dungeon, gridX: number, gridY: number): void {
   for (let step = 0; step < dungeon.grid.width; step++) press('ArrowLeft');
   for (let step = 0; step < dungeon.grid.height; step++) press('ArrowUp');
-  for (let step = 0; step < x; step++) press('ArrowRight');
-  for (let step = 0; step < y; step++) press('ArrowDown');
+  for (let step = 0; step < gridX; step++) press('ArrowRight');
+  for (let step = 0; step < gridY; step++) press('ArrowDown');
 }
 
 beforeEach(() => { document.body.innerHTML = ''; });
@@ -112,9 +112,9 @@ describe('keyboard held marker survives no store restore', () => {
     // Both markers remain exactly where the restored snapshot placed them.
     const monster = dungeon.markers.find((marker) => marker.type === 'monster')!;
     const treasure = dungeon.markers.find((marker) => marker.type === 'treasure')!;
-    expect({ x: monster.x, y: monster.y }).toEqual({ x: 1, y: 2 });
-    expect({ x: treasure.x, y: treasure.y }).toEqual({ x: 3, y: 2 });
+    expect({ gridX: monster.gridX, gridY: monster.gridY }).toEqual({ gridX: 1, gridY: 2 });
+    expect({ gridX: treasure.gridX, gridY: treasure.gridY }).toEqual({ gridX: 3, gridY: 2 });
     // Nothing was relocated onto the drop cell.
-    expect(dungeon.markers.some((marker) => marker.x === 5 && marker.y === 2)).toBe(false);
+    expect(dungeon.markers.some((marker) => marker.gridX === 5 && marker.gridY === 2)).toBe(false);
   });
 });
